@@ -179,7 +179,7 @@ class Scene:
             prt, _ = to_print(img[..., :3], contrast=.8)
             sp = Sprite(prt * .7 + PAPER * .3, img[..., 3])
             side = r.choice([-1, 1])
-            pos = (CX + side * r.uniform(480, 620), r.uniform(200, H - 200))
+            pos = (CX + side * r.uniform(560, 700), r.uniform(1050, H - 150))  # 라벨·글자를 가리지 않게 아래쪽 가장자리에서만
             self.els.append(El(f'fg{i}', lambda f, sp=sp: sp, pos, z=r.uniform(.62, .72), rot=r.uniform(-25, 25),
                                enter=r.integers(1, 5) * .25, seed=self.seed, chaos=ch, opacity=.95))
 
@@ -302,7 +302,9 @@ class Scene:
         h = 1180 if src['kind'] == 'video' else 1120
         hb = self._subject(sc['hero'], (CX - 30 + side * 30 * ch, 1010), h, True, 1.5, rot=r.uniform(-1, 1) * (1 + 3 * ch))
         size = 330
-        self._calli(sc['calli'], size, (CX - 40 + side * 60, max(S['top'] + 200, hb['top'] + 60)), .5, 1.5)
+        # 영상 프린트는 윗선에 겹치고, 사진 인물은 얼굴을 가리지 않도록 머리 위에
+        cy = hb['top'] + 60 if src['kind'] == 'video' else hb['top'] - size * .28
+        self._calli(sc['calli'], size, (CX - 40 + side * 60, max(S['top'] + 200, cy)), .5, 1.5)
         lab = lockup_sprite(sc['en'], sc['label'], self.seed, ch, title_size=86, desc_size=30)
         self._type('label', lab, (S['left'] + 30 + lab.size[0] / 2, S['top'] + 10 + lab.size[1] / 2), 1.0)
 
