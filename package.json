@@ -1,0 +1,28 @@
+{
+  "name": "memorial-docent-shorts",
+  "version": "1.0.0",
+  "scripts": {
+    "clips": "node scripts/prepare-clips.mjs",
+    "bgm": "python3 scripts/make-bgm.py"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Landy82/videoforspecialdocent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Landy82/videoforspecialdocent/issues"
+  },
+  "homepage": "https://github.com/Landy82/videoforspecialdocent#readme",
+  "dependencies": {
+    "@fontsource/black-han-sans": "^5.3.0",
+    "@fontsource/nanum-myeongjo": "^5.3.0",
+    "@remotion/cli": "^4.0.529",
+    "@remotion/renderer": "^4.0.529",
+    "pretendard": "^1.3.9",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.529"
+  },
+  "private": true,
+  "type": "module"
+}
