@@ -2,3 +2,6 @@ node_modules/
 public/clips/*.mp4
 out/
 *.log
+public/fx/
+assets/video/
+assets/generated/
