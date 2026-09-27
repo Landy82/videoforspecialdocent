@@ -29,7 +29,8 @@ SAFE = dict(left=60, right=W - 150, top=250, bottom=H - 400)
 SOURCES = {
     'struggle': dict(kind='video', shoot='20260830_150557', part=36, person=True),
     'shirt': dict(kind='video', shoot='20260830_151741', part=27, person=True),
-    'cloth': dict(kind='video', shoot='20260830_151129', part=8, person=True, recolor_hue=[(0, 10), (165, 180)]),
+    # 붉은 천은 바닥 조각까지 칠해져 핏자국처럼 보여 선택적 재채색을 쓰지 않음 (추모 원칙: 피 느낌 금지)
+    'cloth': dict(kind='video', shoot='20260830_151129', part=8, person=True),
     'spotlight': dict(kind='still', src='public/stills/spotlight_man.jpg', person=True),
     'fist': dict(kind='still', src='public/stills/woman_fist_guitar.jpg', person=True),
     'sign': dict(kind='still', src='public/stills/woman_sign.jpg', person=True),
