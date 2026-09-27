@@ -5,3 +5,4 @@ out/
 public/fx/
 assets/video/
 assets/generated/
+.vox_cache/

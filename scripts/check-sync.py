@@ -11,5 +11,6 @@ off = [((c / fps) / beat - round((c / fps) / beat)) * beat * fps for c in cuts]
 print(f'프레임 {len(v)}개, 컷 {len(cuts)}개')
 for c, o in zip(cuts, off):
     print(f'  {c/fps:6.2f}s  (박 격자와 {o:+.0f}프레임)')
-bad = [c for c, o in zip(cuts, off) if abs(o) > 1]
-print('박에서 1프레임 넘게 벗어난 컷:', [round(c / fps, 2) for c in bad] or '없음')
+half = [((c / fps) / (beat / 2) - round((c / fps) / (beat / 2))) * beat / 2 * fps for c in cuts]
+bad = [c for c, o in zip(cuts, half) if abs(o) > 1.5]
+print('반 박(8분음표) 격자에서 1.5프레임 넘게 벗어난 컷:', [round(c / fps, 2) for c in bad] or '없음')
