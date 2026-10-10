@@ -4,7 +4,7 @@
 set -e
 SRCDIR=$1; OUT=$2; HERE=$(cd "$(dirname "$0")" && pwd)
 node -e "
-global.window={}; const {SRC,CLIPS}=require('$HERE/clips.js');
+const w={}; require('vm').runInNewContext(require('fs').readFileSync('$HERE/clips.js','utf8'),{window:w}); const {SRC,CLIPS}=w;
 for (const [id,c] of Object.entries(CLIPS)) console.log(id, SRC[c.src], c.ss, c.sp, c.dur, Math.round(c.dur*30));
 " | { while read id f ss sp dur n; do
   mkdir -p "$OUT/$id"
