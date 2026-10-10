@@ -25,3 +25,7 @@ Higgsfield 작업 공간에서 했고, 작업 저장소 환경에서는 Higgsfie
 - 사운드: docu/sound.py 코드 합성(샘플 없음) + 배우 원음 대사, 전체 -14 LUFS
 - 엔딩 정보 글자 크기 축소
 - https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/8d1f1ee7-39f5-439b-99c3-3d772ae45e44.mp4
+
+## 부마 × 특별도슨트 30초 모션 숏폼 v2.0 (motion/)
+- 콘셉트 「선 하나가 몸이 되고, 몸이 역사가 된다」 · 120BPM · 60fps · 보라 #62579F 메인 · 루프
+- https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/1f5de74a-124e-4824-8c26-6eb5a82c0cfc.mp4
