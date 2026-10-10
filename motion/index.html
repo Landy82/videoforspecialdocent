@@ -95,7 +95,7 @@ function state(t) {
         [5.0, { x, y: 480, w: 260, h: 680, r: 130 }, .4],
         [5.5, { y: y2 }, .4],
         [6.0, { x: 80, y: 400, w: 840, h: 900, r: 0 }, .4]], t);
-      win({ id, ...g, clip: 'lunge', toff: id === 'w1' ? -.6 : -1.2, fz: 1.25, z: 1 });
+      win({ id, ...g, clip: 'lunge', toff: id === 'w1' ? -.6 : -1.2, fz: .9, z: 1 });
     }
   }
 
@@ -300,7 +300,7 @@ function applyWin(o, prev, t) {
   s.transform = tf;
   // 영상: 창 중심이 피사체(fx,fy)를 따라감
   const c = CLIPS[o.clip];
-  const fz = Math.max(o.fz || .85, o.w / W, o.h / H);
+  const fz = Math.max(o.fz || c.wz || .85, o.w / W, o.h / H);
   const im = e.im.style;
   im.width = W * fz + 'px'; im.height = H * fz + 'px';
   im.left = clamp(o.w / 2 - c.fx * fz, o.w - W * fz, 0) + 'px'; im.top = clamp(o.h / 2 - c.fy * fz, o.h - H * fz, 0) + 'px';
