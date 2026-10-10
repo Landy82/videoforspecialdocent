@@ -254,11 +254,13 @@ def main(root, out, workers=os.cpu_count()):
                           '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p', tmp], stdin=subprocess.PIPE)
     n = int(DURATION * FPS)
     from multiprocessing import Pool
-    with Pool(workers) as pool:  # 연속 구간 단위로 나눠 순차 읽기 유지
-        for j, fr in enumerate(pool.imap(render_frame, range(n), chunksize=45)):
-            p.stdin.write(fr)
-            if j % 150 == 0:
-                print('frame', j, '/', n, flush=True)
+    CH = 20  # 연속 구간 단위로 나눠 순차 읽기 유지
+    step = workers * CH  # 한 번에 이만큼만 메모리에 둔다 (imap은 결과가 쌓여 OOM)
+    with Pool(workers) as pool:
+        for b in range(0, n, step):
+            for fr in pool.map(render_frame, range(b, min(n, b + step)), chunksize=CH):
+                p.stdin.write(fr)
+            print('frame', min(n, b + step), '/', n, flush=True)
     p.stdin.close(); p.wait()
     # 오디오: 무음 + 마지막 배우 원음 한 줄 (-16 LUFS)
     vt, vkey, vst, vlen = VOICE
