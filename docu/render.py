@@ -217,36 +217,48 @@ def overlay(card, t, shot_t0):
     return c
 
 
-def main(root, out):
-    rd = Reader(root)
+_RD, _ROOT = None, None
+_GRAIN = [np.random.default_rng(1979 + k).normal(0, .025, (H // 2, W // 2, 1)).astype(np.float32) for k in range(4)]
+_FLASH = {int(round(sh[0] * FPS)) for sh in SHOTS if sh[5]['kind'] == 'turn'}
+
+
+def render_frame(i):
+    global _RD
+    if _RD is None:
+        _RD = Reader(_ROOT)
+    t = i / FPS
+    s = next(sh for sh in SHOTS if sh[0] <= t < sh[1]) if t < DURATION else SHOTS[-1]
+    t0, t1, key, st, speed, card = s
+    k = i - int(round(t0 * FPS))
+    src_fps = SRC[key][1]
+    idx = int(round(st * src_fps + k * speed * src_fps / FPS))
+    f = _RD.frame(key, idx)[..., ::-1]
+    g = grade(f, 1.0 + .07 * (t - t0) / (t1 - t0))
+    if card['kind'] == 'cta':
+        g = np.zeros_like(g)
+    g = scrim(g, top=.5, bottom=.8 if card['kind'] != 'montage' else .55)
+    if card['kind'] != 'cta':
+        g = np.clip(g + cv2.resize(_GRAIN[i % 4], (W, H))[..., None], 0, 1)
+    if i in _FLASH:
+        g = np.ones_like(g)  # 1프레임 화이트 플래시 (전환)
+    base = Image.fromarray((g * 255).astype(np.uint8)).convert('RGBA')
+    base.alpha_composite(overlay(card, t, t0))
+    return np.array(base.convert('RGB')).tobytes()
+
+
+def main(root, out, workers=os.cpu_count()):
+    global _ROOT
+    _ROOT = root
     tmp = out + '.video.mp4'
     p = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', str(FPS), '-i', '-',
                           '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p', tmp], stdin=subprocess.PIPE)
-    rng = np.random.default_rng(1979)
-    grain = [rng.normal(0, .025, (H // 2, W // 2, 1)).astype(np.float32) for _ in range(4)]
     n = int(DURATION * FPS)
-    for i in range(n):
-        t = i / FPS
-        s = next(sh for sh in SHOTS if sh[0] <= t < sh[1]) if t < DURATION else SHOTS[-1]
-        t0, t1, key, st, speed, card = s
-        k = i - int(round(t0 * FPS))
-        src_fps = SRC[key][1]
-        idx = int(round(st * src_fps + k * speed * src_fps / FPS))
-        f = rd.frame(key, idx)[..., ::-1]
-        zoom = 1.0 + .07 * (t - t0) / (t1 - t0)
-        g = grade(f, zoom)
-        if card['kind'] == 'cta':
-            g = np.zeros_like(g)
-        g = scrim(g, top=.5, bottom=.8 if card['kind'] != 'montage' else .55)
-        if card['kind'] != 'cta':
-            g = np.clip(g + cv2.resize(grain[i % 4], (W, H))[..., None], 0, 1)
-        if i in {int(round(sh[0] * FPS)) for sh in SHOTS if sh[5]['kind'] in ('turn',)}:
-            g = np.ones_like(g)  # 1프레임 화이트 플래시 (전환)
-        base = Image.fromarray((g * 255).astype(np.uint8)).convert('RGBA')
-        base.alpha_composite(overlay(card, t, t0))
-        p.stdin.write(np.array(base.convert('RGB')).tobytes())
-        if i % 150 == 0:
-            print('frame', i, '/', n, flush=True)
+    from multiprocessing import Pool
+    with Pool(workers) as pool:  # 연속 구간 단위로 나눠 순차 읽기 유지
+        for j, fr in enumerate(pool.imap(render_frame, range(n), chunksize=45)):
+            p.stdin.write(fr)
+            if j % 150 == 0:
+                print('frame', j, '/', n, flush=True)
     p.stdin.close(); p.wait()
     # 오디오: 무음 + 마지막 배우 원음 한 줄 (-16 LUFS)
     vt, vkey, vst, vlen = VOICE
