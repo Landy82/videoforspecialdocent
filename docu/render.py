@@ -266,7 +266,7 @@ def main(root, out, workers=os.cpu_count()):
     vt, vkey, vst, vlen = VOICE
     vsrc = os.path.join(root, SRC[vkey][0])
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', tmp, '-ss', str(vst), '-t', str(vlen), '-i', vsrc,
-                    '-filter_complex', f'[1:a]afade=t=in:d=0.15,afade=t=out:st={vlen - 0.4}:d=0.4,loudnorm=I=-16:TP=-1.5,adelay={int(vt * 1000)}|{int(vt * 1000)},apad[a]',
+                    '-filter_complex', f'[1:a]afade=t=in:d=0.15,afade=t=out:st={vlen - 0.4}:d=0.4,loudnorm=I=-16:TP=-1.5,aformat=sample_rates=48000:channel_layouts=stereo,adelay={int(vt * 1000)}:all=1,apad[a]',
                     '-map', '0:v', '-map', '[a]', '-t', str(DURATION), '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000',
                     '-movflags', '+faststart', out], check=True)
     os.remove(tmp)
