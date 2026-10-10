@@ -273,7 +273,13 @@ function frameURL(clip, t, toff = 0) {
 const pending = [];
 function setSrc(img, url) { if (img.getAttribute('src') !== url) { img.src = url; pending.push(img.decode().catch(() => {})); } }
 const bgCache = {};
-function preload(url) { if (!bgCache[url]) { const im = new Image(); im.src = url; bgCache[url] = im.decode().catch(() => {}); } pending.push(bgCache[url]); }
+function preload(url) {
+  if (!bgCache[url]) {
+    const keys = Object.keys(bgCache); if (keys.length > 24) delete bgCache[keys[0]];   // 오래된 프레임은 놓아줌
+    const im = new Image(); im.src = url; bgCache[url] = im.decode().catch(() => {});
+  }
+  pending.push(bgCache[url]);
+}
 
 function blurFilter(id, sx, sy) {
   const fid = 'mb_' + id;

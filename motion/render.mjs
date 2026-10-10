@@ -17,7 +17,7 @@ const [mode, a1, a2, ...rest] = process.argv.slice(2);
 const FPS = 60, SUB = 3, DUR = 30;
 
 async function page(frames) {
-  const browser = await pw.chromium.launch({ args: ['--allow-file-access-from-files', '--disable-web-security'] });
+  const browser = await pw.chromium.launch({ args: ['--allow-file-access-from-files', '--disable-web-security', '--disable-dev-shm-usage'] });
   const p = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
   p.on('pageerror', e => console.error('pageerror', e.message));
   const url = 'file://' + path.join(HERE, 'index.html') + (frames ? '?frames=' + encodeURIComponent(path.resolve(frames)) : '');
@@ -44,15 +44,27 @@ if (mode === 'stills') {
   const N = DUR * FPS * SUB;
   const from = Number(rest[1] || 0), to = Number(rest[2] || N);
   const jobs = Array.from({ length: workers }, async (_, w) => {
-    const { browser, p } = await page(a1);
+    let ctx = await page(a1), done = 0;
     for (let i = from + w; i < to; i += workers) {
       const f = path.join(out, String(i).padStart(5, '0') + '.jpg');
       if (fs.existsSync(f)) continue;                      // 이어서 렌더 가능
-      await shoot(p, i / (FPS * SUB), f + '.tmp.jpg');
+      for (let attempt = 0; ; attempt++) {
+        try {
+          if (done > 0 && done % 400 === 0) { await ctx.browser.close(); ctx = await page(a1); }  // 메모리 정리
+          await shoot(ctx.p, i / (FPS * SUB), f + '.tmp.jpg');
+          break;
+        } catch (e) {                                       // 탭이 죽으면 새로 띄워 같은 프레임부터
+          console.error('retry', i, e.message.split('\n')[0]);
+          if (attempt > 3) throw e;
+          try { await ctx.browser.close(); } catch {}
+          ctx = await page(a1);
+        }
+      }
       fs.renameSync(f + '.tmp.jpg', f);
+      done++;
       if (i % 600 < workers) console.log('sub', i, '/', N);
     }
-    await browser.close();
+    await ctx.browser.close();
   });
   await Promise.all(jobs);
 } else if (mode === 'audio') {
