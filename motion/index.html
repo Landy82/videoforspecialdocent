@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>선 하나가 몸이 되고</title>
+<!-- 콘셉트: 선 하나가 몸이 되고, 몸이 역사가 된다.
+     보라색 선 하나가 공연을 비추는 창이 되고, 그 창이 부마민주항쟁의 날짜·데이터·3D·글자로 변해 다시 선으로 돌아온다.
+     모든 스타일은 window.seek(t) 안에서 시간만으로 계산한다 (CSS 애니메이션·타이머·프레임 간 상태 없음). -->
+<style>
+  @font-face { font-family: P; src: url(../public/fonts/Pretendard-Black.otf); font-weight: 900; }
+  @font-face { font-family: P; src: url(../public/fonts/Pretendard-ExtraBold.otf); font-weight: 800; }
+  @font-face { font-family: P; src: url(../public/fonts/Pretendard-Bold.otf); font-weight: 700; }
+  @font-face { font-family: P; src: url(../public/fonts/Pretendard-Medium.otf); font-weight: 500; }
+  html, body { margin: 0; background: #000; }
+  #stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #08070C; font-family: P; perspective: 1700px; perspective-origin: 500px 900px; }
+  #cam, #floor, .ext { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; transform-style: preserve-3d; }
+  .abs { position: absolute; left: 0; top: 0; }
+  .win { position: absolute; overflow: hidden; background: #62579F; }
+  .win img { position: absolute; left: 0; top: 0; }
+  .win .wipe { position: absolute; left: 0; width: 100%; background: #62579F; }
+  .tx { position: absolute; white-space: pre; line-height: 1.22; overflow: hidden; padding: 0 .06em; }
+  .tx span { display: inline-block; will-change: transform; }
+  .tx.fill span { -webkit-text-stroke: 3px #C9C2EE; filter: brightness(1.3); color: transparent; -webkit-background-clip: text; background-clip: text; background-repeat: no-repeat; }
+  .ext span { position: absolute; left: 0; top: 0; white-space: pre; font-weight: 900; line-height: 1; backface-visibility: visible; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="cam"><div id="floor"></div></div></div>
+<svg width="0" height="0" style="position:absolute"><defs id="defs"></defs></svg>
+<script src="clips.js"></script>
+<script>
+// ───────── 기본값 ─────────
+const W = 1080, H = 1920, BEAT = 0.5, DUR = 30, FPS = 60;
+const COL = { P: '#62579F', L: '#C9C2EE', A: '#F3B34C', K: '#08070C', W: '#FFFFFF' };
+const FR = new URLSearchParams(location.search).get('frames') || 'frames';
+const CX = 500;                                         // 안전영역(60~930) 가운데
+const LINE = { x: 496, y: 520, w: 8, h: 760, r: 0, rot: 0 };  // 첫 프레임 = 마지막 프레임
+
+// ───────── 이징: 시간의 함수 (튀는 이징 없음) ─────────
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const spr = p => { p = clamp(p); const w = 9; return p >= 1 ? 1 : 1 - (1 + w * p) * Math.exp(-w * p); };  // 임계감쇠 스프링
+const expo = p => { p = clamp(p); return p >= 1 ? 1 : 1 - Math.pow(2, -10 * p); };
+const expoIn = p => { p = clamp(p); return p <= 0 ? 0 : Math.pow(2, 10 * (p - 1)); };
+const lin = p => clamp(p);
+const mix = (a, b, p) => {
+  if (typeof a === 'number') return a + (b - a) * p;
+  if (typeof a === 'string') return p < .5 ? a : b;
+  const o = {}; for (const k in b) o[k] = k in a ? mix(a[k], b[k], p) : b[k]; for (const k in a) if (!(k in b)) o[k] = a[k]; return o;
+};
+// 키: [시작초, 목표값, 걸리는 시간, 이징]. 이전 값에서 목표로 이어서 움직인다
+function tr(keys, t) {
+  let v = keys[0][1];
+  for (let i = 1; i < keys.length; i++) {
+    const [kt, kv, kd = .4, ke = spr] = keys[i];
+    if (t < kt) break;
+    v = mix(v, kv, ke((t - kt) / kd));
+  }
+  return v;
+}
+const hexRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const mixCol = (a, b, p) => { const A = hexRGB(a), B = hexRGB(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * clamp(p))).join(',')})`; };
+const between = (t, a, b) => t >= a && t < b;
+
+// ───────── 장면 상태: t → 선언 (순수 함수) ─────────
+function state(t) {
+  const S = { wins: [], texts: [], rects: [], floor: { rx: 0, y: 0 }, ext: null, cam: 1 + .025 * Math.sin(Math.PI * t / DUR) ** 2 };
+  const win = o => S.wins.push(o), text = o => S.texts.push(o), rect = o => S.rects.push(o);
+
+  // ── 주인공 창 W0: 선 → 슬릿 → 창 → 원 → 알약 → 사각 → 조여짐 → 선 → 회전 ──
+  if (t < 8.0) {
+    const g = tr([
+      [0, LINE],
+      [0.0, { x: 350, y: 520, w: 300, h: 760, r: 0, rot: 0 }, .42],
+      [1.0, { x: 220, y: 470, w: 560, h: 820 }, .4],
+      [2.0, { x: 560, y: 420, w: 360, h: 1000 }, .45],
+      [3.5, { x: 80, y: 1010, w: 840, h: 12, r: 6 }, .38],
+      [4.0, { x: 240, y: 560, w: 520, h: 520, r: 260 }, .45],
+      [4.5, { x: 300, y: 420, w: 400, h: 760, r: 200 }, .4],
+      [5.0, { x: 410, y: 440, w: 260, h: 680, r: 130 }, .4],
+      [5.5, { x: 410, y: 360, w: 260, h: 680, r: 130 }, .4],
+      [6.0, { x: 80, y: 400, w: 840, h: 900, r: 0 }, .4],
+      [6.5, { x: 290, y: 400, w: 420, h: 900 }, .35],
+      [7.0, { x: 440, y: 400, w: 120, h: 900 }, .35],
+      [7.5, { x: 496, y: 430, w: 8, h: 840 }, .22, expo],
+      [7.75, { rot: 90 }, .25, expo],
+    ], t);
+    const clip = t < 2.25 ? 'hook' : t < 3.95 ? 'press' : 'lunge';
+    const wipe = tr([[0, 0], [2.0, 1, .25, expo], [2.25, 2, .25, expo]], t);
+    win({ id: 'w0', ...g, clip, wipe, img: tr([[0, 0], [0.04, 1, .3, expo], [7.4, 0, .15, lin]], t) });
+  }
+  // 세 갈래 알약 (10.17 시민들이 거리로)
+  if (between(t, 5.0, 6.35)) {
+    for (const [id, x, y2] of [['w1', 70, 520], ['w2', 750, 300]]) {
+      const g = tr([[0, { x: 410, y: 440, w: 260, h: 680, r: 130 }],
+        [5.0, { x, y: 480, w: 260, h: 680, r: 130 }, .4],
+        [5.5, { y: y2 }, .4],
+        [6.0, { x: 80, y: 400, w: 840, h: 900, r: 0 }, .4]], t);
+      win({ id, ...g, clip: 'lunge', toff: id === 'w1' ? -.6 : -1.2, fz: 1.25, z: 1 });
+    }
+  }
+
+  // ── 1마디 훅 ──
+  text({ id: 'h1979', str: '1979', x: 80, y: 250, size: 300, wt: 900, inT: 0.5, outT: 2.0 });
+  text({ id: 'h10', str: '10월,', x: 80, y: 1280, size: 116, wt: 800, inT: 1.0, outT: 2.0 });
+  text({ id: 'hbm', str: '부산과 마산에서', x: 80, y: 1415, size: 78, wt: 700, inT: 1.5, outT: 2.0, stg: .035,
+    colors: [COL.A, COL.A, , , COL.A, COL.A] });
+  // ── 2마디 유신: 말할 수 없던 시대 → 눌려서 선이 됨 ──
+  const crush = tr([[0, 1], [3.5, 0, .38, expo]], t);
+  text({ id: 'y72', str: '1972', x: 80, y: 300, size: 200, wt: 900, inT: 2.0, outT: 4.0, sy: crush, oy: 1016 });
+  text({ id: 'yus', str: '유신헌법', x: 80, y: 560, size: 128, wt: 800, inT: 2.1, outT: 4.0, sy: crush, oy: 1016 });
+  text({ id: 'y75', str: '1975', x: 84, y: 760, size: 56, wt: 700, color: COL.A, inT: 2.5, outT: 4.0, sy: crush, oy: 1016 });
+  text({ id: 'gin', str: '긴급조치 9호', x: 80, y: 830, size: 104, wt: 800, inT: 2.55, outT: 4.0, sy: crush, oy: 1016 });
+  text({ id: 'mal', str: '말할 수 없던 시대', x: 80, y: 1080, size: 72, wt: 700, color: COL.L, inT: 3.0, outT: 4.0, sy: crush, oy: 1016, stg: .02 });
+
+  // ── 3–4마디 도형 변형: 10.16 / 10.17 / 10.18 ──
+  const dateTx = (id, str, a, b) => text({ id, str, x: 80, y: 250, size: 64, wt: 800, color: COL.A, inT: a, outT: b });
+  dateTx('d16', '1979. 10. 16', 4.0, 5.0);
+  dateTx('d17', '10. 17', 5.0, 6.0);
+  dateTx('d18', '10. 18', 6.0, 7.5);
+  text({ id: 's16a', str: '부산대에서', x: 80, y: 1150, size: 100, wt: 800, inT: 4.0, outT: 5.0 });
+  text({ id: 's16b', str: '시위가 시작되다', x: 80, y: 1278, size: 100, wt: 800, inT: 4.1, outT: 5.0 });
+  text({ id: 's17', str: '시민들이 거리로', x: 80, y: 1200, size: 100, wt: 800, inT: 5.0, outT: 6.0 });
+  text({ id: 's18a', str: '0시,', x: 80, y: 1340, size: 84, wt: 800, color: COL.L, inT: 6.0, outT: 7.5 });
+  text({ id: 's18b', str: '비상계엄 선포', x: 260, y: 1340, size: 84, wt: 800, inT: 6.1, outT: 7.5 });
+
+  // ── 5–6마디 데이터/UI: 10.16 → 10.20, 부산 → 마산 ──
+  if (between(t, 7.9, 13.6)) {
+    const k = tr([[0, 0], [8.5, 1, .35], [9.0, 2, .35], [9.5, 3, .35], [10.0, 4, .35]], t);
+    const gone = tr([[0, 1], [12.4, 0, .35, expoIn]], t);           // UI가 접혀 사라짐
+    const lineY = 846;
+    rect({ id: 'trk', x: 80, y: lineY, w: 840 * gone, h: 8, color: COL.L, op: .35, layer: 'floor' });
+    rect({ id: 'prg', x: 80, y: lineY, w: k * 210 * gone, h: 8, color: COL.P, layer: 'floor' });
+    for (let i = 0; i < 5; i++) {
+      const s = spr((t - 8.0 - i * .06) / .35) * gone * 30;
+      const on = i <= k + .5;
+      rect({ id: 'nd' + i, x: 80 + i * 210 - s / 2, y: lineY + 4 - s / 2, w: s, h: s, r: s / 2, layer: 'floor',
+        color: Math.round(k) === i ? COL.A : on ? COL.P : COL.L });
+      text({ id: 'nl' + i, str: String(16 + i), x: 80 + i * 210, y: lineY - 84, size: 44, wt: 700, align: 'c', layer: 'floor',
+        color: Math.round(k) === i ? COL.A : COL.L, inT: 8.0 + i * .06, outT: 12.4 });
+    }
+    text({ id: 'ym', str: '1979. 10.', x: 80, y: 250, size: 54, wt: 700, color: COL.L, inT: 8.0, outT: 12.0, layer: 'floor' });
+    const days = ['16', '17', '18', '19', '20', '26'];
+    const dT = [8.0, 8.5, 9.0, 9.5, 10.0, 11.5, 12.0];
+    days.forEach((d, i) => text({ id: 'dc' + d, str: d, x: 80, y: 320, size: 300, wt: 900, layer: 'floor',
+      color: d === '26' ? COL.A : COL.W, inT: dT[i], outT: dT[i + 1], stg: .05 }));
+    // 장소 태그
+    const place = t < 9.5 ? '부산' : '마산·창원';
+    const pw = tr([[0, 150], [9.5, 280, .35]], t) * gone;
+    rect({ id: 'tag', x: 80, y: 930, w: pw * spr((t - 8.1) / .35), h: 76, r: 38, color: COL.P, layer: 'floor' });
+    text({ id: 'tg1', str: '부산', x: 110, y: 937, size: 46, wt: 700, inT: 8.2, outT: 9.5, layer: 'floor' });
+    text({ id: 'tg2', str: '마산·창원', x: 110, y: 937, size: 46, wt: 700, inT: 9.5, outT: 12.4, layer: 'floor' });
+    const ev = [['부산대 시위 시작', 8.0, 8.5], ['시민들이 거리로', 8.5, 9.0], ['0시 비상계엄', 9.0, 9.5], ['마산으로 번진 시위', 9.5, 10.0]];
+    ev.forEach(([s, a, b], i) => text({ id: 'ev' + i, str: s, x: 80, y: 1030, size: 60, wt: 800, inT: a, outT: b, layer: 'floor' }));
+    // 정보 카드: 트랙에서 아래로 펼쳐짐
+    const ch = spr((t - 10.0) / .45) * 360 * gone;
+    rect({ id: 'card', x: 80, y: 1120, w: 840 * gone, h: ch, r: 28, color: COL.P, op: 1, layer: 'floor', border: true });
+    if (t >= 10.1) {
+      const s = spr((t - 10.1) / .45) * gone;
+      win({ id: 'w3', x: 104, y: 1144, w: 250 * s, h: 312 * s, r: 18, clip: 'masan', layer: 'floor', fz: .55 });
+    }
+    text({ id: 'c1', str: '10. 20 정오', x: 390, y: 1168, size: 48, wt: 700, color: COL.A, inT: 10.5, outT: 12.4, layer: 'floor' });
+    text({ id: 'c2', str: '마산·창원', x: 390, y: 1240, size: 76, wt: 900, inT: 10.6, outT: 12.4, layer: 'floor' });
+    text({ id: 'c3', str: '위수령 발동', x: 390, y: 1340, size: 76, wt: 900, inT: 11.0, outT: 12.4, layer: 'floor' });
+  }
+  // W0가 회전해 만든 선이 트랙으로 이어짐 (8.0 직전까지 W0, 이후 trk)
+
+  // ── 7–8마디 2D→3D: UI가 바닥으로 눕고, 10.26이 입체로 선다 ──
+  S.floor.rx = tr([[0, 0], [12.0, 64, .6], [15.5, 0, .5]], t);
+  S.floor.y = tr([[0, 0], [12.0, 260, .6], [15.5, 0, .5]], t);
+  if (between(t, 12.0, 14.0)) {
+    const up = spr((t - 12.2) / .5) * (1 - expoIn((t - 13.5) / .4));
+    S.ext = { str: '10.26', x: 80, y: 320, size: 300, layers: 16,
+      rx: -S.floor.rx * up, ry: tr([[0, 0], [12.5, -32, .45], [13.0, 26, .45], [13.5, 0, .4]], t),
+      op: 1 - expoIn((t - 13.6) / .35) };
+    text({ id: 'yend', str: '18년 유신체제의 끝', x: 80, y: 1360, size: 84, wt: 800, inT: 12.75, outT: 13.45 });
+  }
+  // 바닥에서 패널 4장이 한 박씩 일어남
+  if (between(t, 13.4, 16.9)) {
+    const pos = [[80, 400], [510, 400], [80, 860], [510, 860]];
+    pos.forEach(([x, y], i) => {
+      const appear = spr((t - 13.5 - i * .05) / .4);
+      const upP = spr((t - (14.0 + i * .5)) / .42);
+      let g = { x, y: y + 440 * (1 - appear), w: 410, h: 440 * appear, r: 0 };
+      g = tr([[0, g], [16.0, { x: 80, y: 760, w: 840, h: 300, r: 0 }, .4], [16.5, { x: 80, y: 1094, w: 840, h: 10 }, .38, expo]], t);
+      win({ id: 'p' + i, ...g, clip: 'p' + (i + 1), layer: 'floor', rx: -S.floor.rx * upP, z: i === 0 ? 2 : 1, fz: .5,
+        img: tr([[0, 1], [16.5, 0, .25, lin]], t), hide: i > 0 && t > 16.45 });
+    });
+  }
+
+  // ── 9–10마디 키네틱 타이포 + 글자 속 영상 ──
+  text({ id: 'yeok', str: '그 역사를,', x: 80, y: 880, size: 168, wt: 900, inT: 16.5, outT: 17.5, fill: 'history' });
+  const momK = tr([[0, { x: 150, y: 470, s: 3.0 }], [18.5, { x: 80, y: 700, s: 1 }, .42]], t);
+  text({ id: 'mom', str: '몸', x: momK.x, y: momK.y, size: 230, wt: 900, sc: momK.s, inT: 18.0, outT: 19.95, fill: 'mom', stg: 0 });
+  text({ id: 'euro', str: '으로', x: 330, y: 700, size: 230, wt: 900, inT: 18.5, outT: 19.95 });
+  text({ id: 'gieok', str: '기억하다', x: 80, y: 980, size: 200, wt: 900, color: COL.L, inT: 19.0, outT: 19.95 });
+  if (between(t, 16.9, 17.9)) rect({ id: 'ul0', x: 80, y: 1094, w: tr([[0, 840], [17.5, 0, .35, expoIn]], t), h: 10, color: COL.P });
+  if (between(t, 19.4, 20.5)) {
+    const g = tr([[0, { x: 80, w: 0 }], [19.5, { x: 80, w: 800 }, .4], [20.0, { x: 80, w: 0 }, .01, lin]], t);
+    rect({ id: 'ul1', x: g.x, y: 1236, w: g.w, h: 10, color: COL.A });
+  }
+
+  // ── 11–12마디 몽타주: 밑줄이 쪼개져 영상 띠 5개 ──
+  if (between(t, 20.0, 24.5)) {
+    const L = (a) => a;
+    const A = [0, 1, 2, 3, 4].map(i => ({ x: 80 + i * 170, y: 420 + [0, 80, 40, 120, 20][i], w: 150, h: 760, r: 0, rot: 0 }));
+    const A2 = A.map((g, i) => ({ ...g, y: 420 + [80, 0, 120, 20, 60][i] }));
+    const B = [{ x: 80, y: 400, w: 415, h: 420 }, { x: 505, y: 400, w: 415, h: 420 }, { x: 80, y: 830, w: 273, h: 420 }, { x: 363, y: 830, w: 273, h: 420 }, { x: 646, y: 830, w: 274, h: 420 }];
+    const B2 = [{ x: 80, y: 400, w: 560, h: 420 }, { x: 650, y: 400, w: 270, h: 420 }, { x: 80, y: 830, w: 200, h: 420 }, { x: 290, y: 830, w: 420, h: 420 }, { x: 720, y: 830, w: 200, h: 420 }];
+    const C = [{ x: 80, y: 400, w: 560, h: 850 }, ...[0, 1, 2, 3].map(j => ({ x: 650, y: 400 + j * 215, w: 270, h: 205 }))];
+    const C2 = [{ x: 360, y: 400, w: 560, h: 850 }, ...[0, 1, 2, 3].map(j => ({ x: 80, y: 400 + j * 215, w: 270, h: 205 }))];
+    const D = [0, 1, 2, 3, 4].map(i => ({ x: 90 + i * 135, y: 430 + Math.abs(i - 2) * 40, w: 300, h: 700, rot: (i - 2) * 9 }));
+    const E = [0, 1, 2, 3, 4].map(i => ({ x: 350, y: 470, w: 300, h: 700, rot: 0 }));
+    const BIG = { x: 40, y: 200, w: 1000, h: 820, r: 0, rot: 0 };
+    for (let i = 0; i < 5; i++) {
+      const g = tr([[0, { x: 80 + i * 164, y: 1236, w: 152, h: 10, r: 0, rot: 0 }],
+        [20.0, A[i], .4], [20.5, A2[i], .35], [21.0, { ...B[i], rot: 0 }, .4], [21.5, B2[i], .35],
+        [22.0, C[i], .4], [22.5, C2[i], .35], [23.0, D[i], .4], [23.5, E[i], .35, expo], [24.0, BIG, .45]], t);
+      const isTop = i === 2;
+      win({ id: 'm' + i, ...g, clip: isTop && t >= 24.0 ? 'final' : 'm' + (i + 1), z: isTop ? 3 : 1, fz: .62,
+        wipe: isTop ? tr([[0, 0], [23.75, 1, .25, expo], [24.0, 2, .3, expo]], t) : 0,
+        bg: i % 2 ? COL.A : COL.P, hide: !isTop && t > 24.4 });
+    }
+    const mw = (id, str, a, b, size = 150) => text({ id, str, x: 80, y: 1290, size, wt: 900, inT: a, outT: b });
+    mw('mw1', '춤으로', 20.0, 21.0); mw('mw2', '만나는', 21.0, 22.0); mw('mw3', '민주화운동의', 22.0, 23.0, 124); mw('mw4', '역사', 23.0, 24.0, 170);
+  }
+
+  // ── 13마디 가장 강한 순간: 하나의 큰 창 + 특별도슨트 ──
+  if (between(t, 24.4, 26.6)) {
+    const g = tr([[0, { x: 40, y: 200, w: 1000, h: 820, r: 0, rot: 0 }],
+      [24.5, { x: 140, y: 160, w: 800, h: 900 }, .35],
+      [25.0, { x: 40, y: 260, w: 1000, h: 760 }, .35],
+      [25.5, { x: 300, y: 300, w: 400, h: 700 }, .35],
+      [26.0, { x: 430, y: 1037, w: 140, h: 6 }, .4, expo]], t);
+    win({ id: 'm2', ...g, clip: 'final', z: 3, fz: .62 + .1 * clamp((t - 24) / 2), img: tr([[0, 1], [25.9, 0, .2, lin]], t) });
+  }
+  text({ id: 'tb', str: '특별도슨트', x: 80, y: 1080, size: 170, wt: 900, inT: 24.0, outT: 25.75, stg: .05 });
+  text({ id: 'tbs', str: '춤으로 만나는 민주화운동의 역사', x: 84, y: 1300, size: 50, wt: 700, color: COL.L, inT: 24.5, outT: 25.75, stg: .015 });
+  if (between(t, 25.0, 26.0)) {  // 창 테두리가 박자에 그려짐
+    const p = expo((t - 25.0) / .3) * (1 - expoIn((t - 25.5) / .3));
+    rect({ id: 'fr1', x: 40, y: 236, w: 1000 * p, h: 10, color: COL.A });
+    rect({ id: 'fr2', x: 1040 - 1000 * p, y: 1024, w: 1000 * p, h: 10, color: COL.A });
+  }
+
+  // ── 14–15마디 엔딩: 검은 화면 흰 글씨 → 다시 선 하나 ──
+  if (t >= 25.9) {
+    const fold = tr([[0, 1], [29.0, 0, .32, expoIn]], t);
+    const et = (id, str, y, size, wt, a, o = {}) => text({ id, str, x: CX, y, size, wt, align: 'c', inT: a, outT: 99, sy: fold, oy: 1040, ...o });
+    et('e1', '민주화운동기념관', 740, 48, 700, 26.0, { ls: .14, stg: .03 });
+    et('e2', '특별도슨트', 810, 150, 900, 26.5, { stg: .05 });
+    et('e3', '매주 금토일', 1080, 72, 700, 27.0);
+    et('e4', '오후 3시', 1176, 72, 700, 27.5);
+    et('e5', '2026. 11. 29까지', 1296, 40, 500, 28.0, { color: COL.L, stg: .02 });
+    const g = tr([[0, { x: 430, y: 1037, w: 140, h: 6, rot: 0 }],
+      [28.5, { x: 300, y: 1037, w: 400, h: 6 }, .35],
+      [29.0, LINE, .45, expo]], t);
+    const c = t < 28.5 ? COL.P : t < 29.0 ? mixCol(COL.P, COL.A, (t - 28.5) / .2) : mixCol(COL.A, COL.P, (t - 29.0) / .3);
+    rect({ id: 'rule', ...g, color: c });
+  }
+  return S;
+}
+
+// ───────── DOM 적용 ─────────
+const stage = document.getElementById('stage'), cam = document.getElementById('cam'), floorEl = document.getElementById('floor');
+const defs = document.getElementById('defs');
+const pool = {};
+function el(id, make) { if (!pool[id]) pool[id] = make(); return pool[id]; }
+function mk(tag, cls, parent) { const e = document.createElement(tag); if (cls) e.className = cls; parent.appendChild(e); return e; }
+function frameURL(clip, t, toff = 0) {
+  const c = CLIPS[clip]; const n = Math.round(c.dur * 30);
+  const i = clamp(Math.floor((t - c.t0 + toff) * 30), 0, n - 1);
+  return `${FR}/${clip}/${String(i + 1).padStart(4, '0')}.jpg`;
+}
+const pending = [];
+function setSrc(img, url) { if (img.getAttribute('src') !== url) { img.src = url; pending.push(img.decode().catch(() => {})); } }
+const bgCache = {};
+function preload(url) { if (!bgCache[url]) { const im = new Image(); im.src = url; bgCache[url] = im.decode().catch(() => {}); } pending.push(bgCache[url]); }
+
+function blurFilter(id, sx, sy) {
+  const fid = 'mb_' + id;
+  let f = document.getElementById(fid);
+  if (!f) {
+    f = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+    f.id = fid; f.setAttribute('x', '-30%'); f.setAttribute('y', '-30%'); f.setAttribute('width', '160%'); f.setAttribute('height', '160%');
+    f.innerHTML = '<feGaussianBlur stdDeviation="0 0"/>'; defs.appendChild(f);
+  }
+  f.firstChild.setAttribute('stdDeviation', `${sx.toFixed(2)} ${sy.toFixed(2)}`);
+  return `url(#${fid})`;
+}
+
+function applyWin(o, prev, t) {
+  const parent = o.layer === 'floor' ? floorEl : cam;
+  const e = el('win_' + o.id, () => { const d = mk('div', 'win', parent); const im = mk('img', '', d); const wp = mk('div', 'wipe', d); return { d, im, wp }; });
+  if (e.d.parentNode !== parent) parent.appendChild(e.d);
+  if (o.hide || o.w < .5 || o.h < .5) { e.d.style.display = 'none'; return; }
+  const s = e.d.style;
+  s.display = 'block'; s.left = o.x + 'px'; s.top = o.y + 'px'; s.width = o.w + 'px'; s.height = o.h + 'px';
+  s.borderRadius = (o.r || 0) + 'px'; s.zIndex = o.z || 1; s.background = o.bg || COL.P;
+  let tf = `rotate(${o.rot || 0}deg)`;
+  if (o.rx) { s.transformOrigin = '50% 100%'; tf = `rotateX(${o.rx}deg) ` + tf; } else s.transformOrigin = '50% 50%';
+  s.transform = tf;
+  // 영상: 창 중심이 피사체(fx,fy)를 따라감
+  const c = CLIPS[o.clip];
+  const fz = Math.max(o.fz || .85, o.w / W, o.h / H);
+  const im = e.im.style;
+  im.width = W * fz + 'px'; im.height = H * fz + 'px';
+  im.left = clamp(o.w / 2 - c.fx * fz, o.w - W * fz, 0) + 'px'; im.top = clamp(o.h / 2 - c.fy * fz, o.h - H * fz, 0) + 'px';
+  im.opacity = o.img === undefined ? 1 : o.img;
+  setSrc(e.im, frameURL(o.clip, t, o.toff));
+  // 와이프: 0 없음 → 1 아래에서 덮음 → 2 위로 걷힘
+  const wp = o.wipe || 0, ws = e.wp.style;
+  if (wp <= 0 || wp >= 2) ws.display = 'none';
+  else { ws.display = 'block'; ws.background = COL.P; if (wp <= 1) { ws.top = o.h * (1 - wp) + 'px'; ws.height = o.h * wp + 'px'; } else { ws.top = '0px'; ws.height = o.h * (2 - wp) + 'px'; } }
+  // 속도 방향 모션블러
+  if (prev) {
+    const vx = Math.abs((o.x + o.w / 2) - (prev.x + prev.w / 2)) + Math.abs(o.w - prev.w) * .5;
+    const vy = Math.abs((o.y + o.h / 2) - (prev.y + prev.h / 2)) + Math.abs(o.h - prev.h) * .5;
+    s.filter = (vx > 3 || vy > 3) ? blurFilter('w' + o.id, Math.min(vx * .3, 24), Math.min(vy * .3, 24)) : 'none';
+  } else s.filter = 'none';
+}
+
+const stgOf = o => Math.min(o.stg === undefined ? .04 : o.stg, .3 / Math.max(1, [...o.str].length));
+function charOffset(o, i, t) {  // 글자 i의 세로 위치(em): 마스크 아래에서 솟고, 위로 가속하며 빠져나감
+  const stg = stgOf(o);
+  const p = spr((t - o.inT - i * stg) / .45);
+  const q = clamp((t - o.outT - Math.min(i * stg * .3, .08)) / .24) ** 3;
+  return (1 - p) * 1.15 - q * 1.25;
+}
+function applyText(o, t) {
+  const parent = o.layer === 'floor' ? floorEl : cam;
+  const e = el('tx_' + o.id, () => {
+    const d = mk('div', 'tx' + (o.fill ? ' fill' : ''), parent);
+    const spans = [...o.str].map(ch => { const s = mk('span', '', d); s.textContent = ch; return s; });
+    return { d, spans };
+  });
+  const n = e.spans.length;
+  const vis = t >= o.inT && t < o.outT + .35;
+  if (!vis || (o.sy !== undefined && o.sy <= .001)) { e.d.style.display = 'none'; return; }
+  const s = e.d.style;
+  s.display = 'block'; s.fontSize = o.size + 'px'; s.fontWeight = o.wt; s.color = o.color || COL.W; s.zIndex = 5;
+  s.letterSpacing = (o.ls !== undefined ? o.ls : (o.size > 120 ? -.035 : -.01)) + 'em';
+  const wpx = e.d.offsetWidth;
+  const x = o.align === 'c' ? o.x - wpx / 2 : o.x;
+  s.left = x + 'px'; s.top = o.y + 'px';
+  let tf = '';
+  if (o.sc && o.sc !== 1) { tf += `scale(${o.sc})`; s.transformOrigin = '0 0'; }
+  if (o.sy !== undefined && o.sy < 1) { tf += ` scaleY(${o.sy})`; s.transformOrigin = `50% ${o.oy - o.y}px`; }
+  s.transform = tf || 'none';
+  let url = null;
+  if (o.fill) { url = frameURL(o.fill, t); preload(url); }
+  const boxW = wpx, boxH = e.d.offsetHeight;
+  e.spans.forEach((sp, i) => {
+    const y0 = charOffset(o, i, t), y1 = charOffset(o, i, t - 1 / FPS);
+    const v = Math.abs(y0 - y1) * o.size;                          // px/frame
+    const smear = 1 + Math.min(.5, v / 90);                          // 빠를수록 진행 방향으로 늘어남
+    sp.style.transform = `translateY(${y0}em) scaleY(${smear.toFixed(3)})`;
+    sp.style.transformOrigin = y0 > 0 ? '50% 100%' : '50% 0%';
+    sp.style.color = o.fill ? 'transparent' : (o.colors && o.colors[i]) || '';
+    if (url) {
+      const c = CLIPS[o.fill], fz = Math.max(boxW / W, boxH / H) * 1.05;
+      sp.style.backgroundImage = `url(${url})`;
+      sp.style.backgroundSize = `${W * fz}px ${H * fz}px`;
+      sp.style.backgroundPosition = `${boxW / 2 - c.fx * fz - sp.offsetLeft}px ${boxH / 2 - c.fy * fz}px`;
+    }
+  });
+}
+
+function applyRect(o) {
+  const parent = o.layer === 'floor' ? floorEl : cam;
+  const e = el('rc_' + o.id, () => mk('div', 'abs', parent));
+  const s = e.style;
+  if (o.w <= .3 || o.h <= .3) { s.display = 'none'; return; }
+  s.display = 'block'; s.left = o.x + 'px'; s.top = o.y + 'px'; s.width = o.w + 'px'; s.height = o.h + 'px';
+  s.zIndex = o.id === 'card' ? 0 : 4;
+  s.borderRadius = (o.r || 0) + 'px';
+  if (o.border) { s.background = 'transparent'; s.border = `4px solid ${o.color}`; s.boxSizing = 'border-box'; }
+  else s.background = o.color;
+  s.opacity = o.op === undefined ? 1 : o.op;
+  s.transform = o.rot ? `rotate(${o.rot}deg)` : 'none';
+}
+
+function applyExt(x) {
+  const e = el('ext', () => { const d = mk('div', 'ext', floorEl); const ls = []; for (let i = 0; i < 16; i++) ls.push(mk('span', '', d)); return { d, ls }; });
+  if (!x) { e.d.style.display = 'none'; return; }
+  const s = e.d.style;
+  s.display = 'block'; s.opacity = x.op;
+  s.transformOrigin = `${x.x + 300}px ${x.y + x.size}px`;
+  s.transform = `rotateX(${x.rx}deg) rotateY(${x.ry}deg)`;
+  e.ls.forEach((sp, i) => {
+    const k = e.ls.length - 1 - i;                                  // 뒤 레이어부터
+    sp.textContent = x.str; sp.style.fontSize = x.size + 'px'; sp.style.letterSpacing = '-.035em';
+    sp.style.left = x.x + 'px'; sp.style.top = x.y + 'px';
+    sp.style.transform = `translateZ(${-k * 7}px)`;
+    sp.style.color = k === 0 ? COL.A : mixCol(COL.P, '#1C1830', k / e.ls.length);
+  });
+}
+
+let lastIds = new Set();
+window.seek = async function (t) {
+  pending.length = 0;
+  const S = state(t), P = state(Math.max(0, t - 1 / FPS));
+  const prevWins = Object.fromEntries(P.wins.map(w => [w.id, w]));
+  const used = new Set();
+  cam.style.transformOrigin = '540px 960px';
+  cam.style.transform = `scale(${S.cam})`;
+  floorEl.style.transformOrigin = '500px 850px';
+  floorEl.style.transform = `translateY(${S.floor.y}px) rotateX(${S.floor.rx}deg)`;
+  for (const w of S.wins) { applyWin(w, prevWins[w.id], t); used.add('win_' + w.id); }
+  for (const x of S.texts) { applyText(x, t); used.add('tx_' + x.id); }
+  for (const r of S.rects) { applyRect(r); used.add('rc_' + r.id); }
+  applyExt(S.ext); used.add('ext');
+  for (const id in pool) if (!used.has(id)) { const p = pool[id]; (p.d || p).style.display = 'none'; }
+  await Promise.all(pending);
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  return true;
+};
+window.ready = (async () => {
+  await Promise.all(['900', '800', '700', '500'].map(w => document.fonts.load(`${w} 100px P`, '가나다0123')));
+  await document.fonts.ready;
+  return true;
+})();
+const qt = new URLSearchParams(location.search).get('t');
+if (qt !== null) window.ready.then(() => window.seek(parseFloat(qt)));
+</script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>사운드트랙</title></head>
+<body>
+<script>
+// 120BPM, D단조. 박마다 킥, 장면이 바뀔 때마다 히트, 마지막 온마디(24s) 앞으로 라이저.
+// 샘플·음원 없이 Web Audio 오실레이터와 노이즈만으로 합성 → WAV
+const SR = 48000, DUR = 30, BEAT = .5, BAR = 2;
+const SCENES = [2, 4, 8, 12, 16, 20, 24, 26];          // index.html 장면 전환 시각
+const PROG = ['Dm', 'Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'Gm', 'F', 'C', 'Dm', 'Bb', 'F', 'C', 'Dm'];
+const CH = { Dm: [62, 65, 69], Bb: [58, 62, 65], F: [65, 69, 72], C: [60, 64, 67], Gm: [55, 58, 62] };
+const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+
+window.renderWav = async function () {
+  const ctx = new OfflineAudioContext(2, SR * DUR, SR);
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -14; comp.ratio.value = 3; comp.attack.value = .005; comp.release.value = .15;
+  const master = ctx.createGain(); master.gain.value = .6;
+  comp.connect(master); master.connect(ctx.destination);
+  const bus = ctx.createGain(); bus.connect(comp);
+  // 리버브 (생성한 IR)
+  const rev = ctx.createConvolver();
+  const irLen = SR * 2.2, ir = ctx.createBuffer(2, irLen, SR);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < irLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irLen, 3.2); }
+  rev.buffer = ir;
+  const revGain = ctx.createGain(); revGain.gain.value = .32; rev.connect(revGain); revGain.connect(comp);
+  // 노이즈 버퍼
+  const nb = ctx.createBuffer(1, SR * 5, SR); { const d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+
+  const out = (node, g, pan = 0, send = 0) => {
+    const gn = ctx.createGain(); gn.gain.value = g;
+    const p = ctx.createStereoPanner(); p.pan.value = pan;
+    node.connect(gn); gn.connect(p); p.connect(bus);
+    if (send) { const s = ctx.createGain(); s.gain.value = send; p.connect(s); s.connect(rev); }
+    return gn;
+  };
+  const env = (param, t, a, peak, d, end = .0001) => {
+    param.setValueAtTime(.0001, t); param.exponentialRampToValueAtTime(peak, t + a); param.exponentialRampToValueAtTime(end, t + a + d);
+  };
+  const noise = (t, d) => { const s = ctx.createBufferSource(); s.buffer = nb; s.start(t, Math.random() * 1.5, d + .05); return s; };
+
+  function kick(t, g = 1) {
+    const o = ctx.createOscillator(); o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(44, t + .13);
+    const a = ctx.createGain(); env(a.gain, t, .002, 1, .42);
+    o.connect(a); out(a, .95 * g); o.start(t); o.stop(t + .5);
+    const n = noise(t, .02), f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2500;
+    const b = ctx.createGain(); env(b.gain, t, .001, .3, .02); n.connect(f); f.connect(b); out(b, .3 * g);
+  }
+  function hat(t, g = 1, pan = .25) {
+    const n = noise(t, .08), f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7500;
+    const a = ctx.createGain(); env(a.gain, t, .001, .5, .06); n.connect(f); f.connect(a); out(a, .22 * g, pan);
+  }
+  function clap(t, g = 1) {
+    const n = noise(t, .3), f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1600; f.Q.value = .8;
+    const a = ctx.createGain(); a.gain.setValueAtTime(.0001, t);
+    for (const o of [0, .012, .024]) { a.gain.exponentialRampToValueAtTime(.9, t + o + .002); a.gain.exponentialRampToValueAtTime(.2, t + o + .01); }
+    a.gain.exponentialRampToValueAtTime(.0001, t + .25);
+    n.connect(f); f.connect(a); out(a, .32 * g, 0, .25);
+  }
+  function bass(t, m, d, g = 1) {
+    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz(m);
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(180, t + d);
+    const a = ctx.createGain(); env(a.gain, t, .005, .8, d);
+    o.connect(f); f.connect(a); out(a, .32 * g); o.start(t); o.stop(t + d + .05);
+  }
+  function pad(t, notes, d, g = 1, cut = 1400) {
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut; f.Q.value = .4;
+    const a = ctx.createGain(); a.gain.setValueAtTime(.0001, t); a.gain.exponentialRampToValueAtTime(1, t + .25);
+    a.gain.setValueAtTime(1, t + d - .2); a.gain.exponentialRampToValueAtTime(.0001, t + d + .1);
+    f.connect(a); out(a, .07 * g, 0, .5);
+    for (const m of notes) for (const det of [-7, 0, 7]) {
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz(m); o.detune.value = det;
+      o.connect(f); o.start(t); o.stop(t + d + .15);
+    }
+  }
+  function pluck(t, m, g = 1, pan = 0, d = .35) {
+    const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = hz(m);
+    const o2 = ctx.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = hz(m) * 2.001;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(5000, t); f.frequency.exponentialRampToValueAtTime(400, t + d);
+    const a = ctx.createGain(); env(a.gain, t, .003, .6, d);
+    const g2 = ctx.createGain(); g2.gain.value = .25; o2.connect(g2); g2.connect(f);
+    o.connect(f); f.connect(a); out(a, .2 * g, pan, .35); o.start(t); o.stop(t + d + .05); o2.start(t); o2.stop(t + d + .05);
+  }
+  function tick(t, f0 = 1800, g = 1, pan = 0) {
+    const o = ctx.createOscillator(); o.frequency.value = f0;
+    const a = ctx.createGain(); env(a.gain, t, .001, .5, .035); o.connect(a); out(a, .16 * g, pan); o.start(t); o.stop(t + .06);
+  }
+  function hit(t, g = 1) {
+    const o = ctx.createOscillator(); o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(30, t + 1.1);
+    const a = ctx.createGain(); env(a.gain, t, .004, 1, 1.3); o.connect(a); out(a, .8 * g, 0, .2); o.start(t); o.stop(t + 1.4);
+    const n = noise(t, 1.2), f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(7000, t); f.frequency.exponentialRampToValueAtTime(300, t + 1.0);
+    const b = ctx.createGain(); env(b.gain, t, .002, .8, 1.0); n.connect(f); f.connect(b); out(b, .35 * g, 0, .5);
+  }
+  function whoosh(t, d = .35, g = 1, up = true, pan = 0) {
+    const n = noise(t, d), f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
+    f.frequency.setValueAtTime(up ? 400 : 6000, t); f.frequency.exponentialRampToValueAtTime(up ? 6000 : 400, t + d);
+    const a = ctx.createGain(); a.gain.setValueAtTime(.0001, t); a.gain.exponentialRampToValueAtTime(.7, t + d * .7); a.gain.exponentialRampToValueAtTime(.0001, t + d);
+    n.connect(f); f.connect(a); out(a, .3 * g, pan, .3);
+  }
+  function riser(t, d) {
+    const n = noise(t, Math.min(d, 2.9)), f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(9000, t + d);
+    const a = ctx.createGain(); a.gain.setValueAtTime(.0001, t); a.gain.exponentialRampToValueAtTime(.9, t + d - .02); a.gain.linearRampToValueAtTime(0, t + d);
+    n.connect(f); f.connect(a); out(a, .45, 0, .3);
+    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(880, t + d);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2500;
+    const b = ctx.createGain(); b.gain.setValueAtTime(.0001, t); b.gain.exponentialRampToValueAtTime(.5, t + d - .02); b.gain.linearRampToValueAtTime(0, t + d);
+    o.connect(lp); lp.connect(b); out(b, .18, 0, .2); o.start(t); o.stop(t + d);
+  }
+
+  // ── 편곡 ──
+  for (let b = 0; b < 60; b++) {
+    const t = b * BEAT, bar = Math.floor(t / BAR), inBar = b % 4;
+    if (t >= 23.5 && t < 24) continue;                       // 마지막 온마디 직전 반 박 정적
+    kick(t, bar === 12 ? 1.15 : bar >= 13 ? .8 : 1);
+    if (bar >= 1 && bar !== 13) hat(t + .25, bar >= 10 ? 1.1 : .8);
+    if (bar >= 2 && inBar % 2 === 1 && bar < 13) clap(t, bar >= 10 ? 1.1 : .8);
+    if (bar === 12) { clap(t + .25, .5); hat(t + .125, .6, -.3); hat(t + .375, .6, .3); }
+  }
+  PROG.forEach((c, bar) => {
+    const t = bar * BAR, n = CH[c];
+    pad(t, n, BAR, bar >= 10 && bar <= 12 ? 1.4 : 1, bar >= 12 ? 2200 : 1300);
+    if (bar >= 1) for (let e = 0; e < 4; e++) bass(t + e * BEAT + .25, n[0] - 24, .2, bar === 12 ? 1.2 : 1);
+  });
+  // 데이터 구간(8–12s): 16분음표 UI 틱 + 카운터 블립
+  for (let i = 0; i < 32; i++) tick(8 + i * .125, i % 4 === 0 ? 2400 : 1600, i % 4 === 0 ? 1 : .5, (i % 2) * .6 - .3);
+  [8, 8.5, 9, 9.5, 10, 11.5].forEach((t, i) => pluck(t, [74, 77, 81, 84, 86, 86][i], 1.2));
+  // 3D 구간: 바닥이 눕는 소리 + 패널 넘어갈 때마다 스윕
+  whoosh(11.8, .45, 1.2, false);
+  [14, 14.5, 15, 15.5].forEach((t, i) => whoosh(t - .15, .3, 1, true, [-.5, .5, -.3, .3][i]));
+  // 몽타주 아르페지오 (20–24)
+  for (let i = 0; i < 28; i++) { const t = 20 + i * .125, c = CH[PROG[Math.floor(t / BAR)]]; pluck(t, c[[0, 1, 2, 1][i % 4]] + 12, .7, (i % 2) * .8 - .4, .2); }
+  // 장면 전환 히트 + 마지막 온마디 라이저
+  SCENES.forEach(t => hit(t, t === 24 ? 1.5 : t === 26 ? .7 : 1));
+  riser(22, 1.98);
+  // 엔딩: 글자마다 맑은 플럭, 마지막엔 선으로 접히는 소리
+  [[26, 77], [26.5, 81], [27, 84], [27.5, 86], [28, 89]].forEach(([t, m]) => pluck(t, m, 1.1, 0, .8));
+  whoosh(28.8, .45, 1, false);
+  pluck(29.5, 62, 1, 0, 1.2);
+
+  const buf = await ctx.startRendering();
+  // WAV 16bit 인코딩
+  const L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length;
+  const ab = new ArrayBuffer(44 + n * 4), v = new DataView(ab);
+  const ws = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  ws(0, 'RIFF'); v.setUint32(4, 36 + n * 4, true); ws(8, 'WAVE'); ws(12, 'fmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 2, true); v.setUint32(24, SR, true); v.setUint32(28, SR * 4, true);
+  v.setUint16(32, 4, true); v.setUint16(34, 16, true); ws(36, 'data'); v.setUint32(40, n * 4, true);
+  for (let i = 0; i < n; i++) {
+    v.setInt16(44 + i * 4, Math.max(-1, Math.min(1, L[i])) * 32767, true);
+    v.setInt16(46 + i * 4, Math.max(-1, Math.min(1, R[i])) * 32767, true);
+  }
+  const bytes = new Uint8Array(ab); let s = '';
+  for (let i = 0; i < bytes.length; i += 32768) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+  return btoa(s);
+};
+</script>
+</body></html>
