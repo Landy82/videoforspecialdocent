@@ -8,7 +8,7 @@ const w={}; require('vm').runInNewContext(require('fs').readFileSync('$HERE/clip
 for (const [id,c] of Object.entries(CLIPS)) console.log(id, SRC[c.src], c.ss, c.sp, c.dur, Math.round(c.dur*30));
 " | { while read id f ss sp dur n; do
   mkdir -p "$OUT/$id"
-  ffmpeg -v error -y -ss "$ss" -i "$SRCDIR/$f" -t "$(python3 -c "print($dur*$sp+0.2)")" -an \
+  ffmpeg -v error -y -ss "$ss" -t "$(python3 -c "print($dur*$sp+0.2)")" -i "$SRCDIR/$f" -an \
     -vf "setpts=(PTS-STARTPTS)/$sp,fps=30,scale=1080:1920" -frames:v "$n" -q:v 3 "$OUT/$id/%04d.jpg" &
 done; wait; }
 for d in "$OUT"/*/; do echo "$(basename "$d") $(ls "$d" | wc -l)"; done
