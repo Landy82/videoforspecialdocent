@@ -12,3 +12,8 @@ Higgsfield 작업 공간에서 했고, 작업 저장소 환경에서는 Higgsfie
 
 - v2.2 재현: `python3 -m vox.build --seed 1987 --chaos .45 --bpm 112 --version v2.2` (자세한 방법은 vox/README.md)
 - v1.0 재현: Remotion (`src/`), `npm run render`
+
+## 부마민주항쟁 숏츠 v1.0 (docu/render.py, 실물 영상만)
+- 52초 · 1080×1920 30fps · H.264 + AAC (배경음악 없음, 끝부분 배우 원음 "우리가 대한민국의 주인입니다." 한 줄)
+- 1972 유신 → 1979.10.16~20 부산·마산 → 10.26 → 공연 몽타주 → 검은 화면 엔딩(민주화운동기념관 / 특별도슨트 / 매주 금토일 / 오후 3시)
+- https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/28229725-c05f-4113-9a6c-fc297168f825.mp4
