@@ -172,9 +172,15 @@ def build(path):
     import score
     dur = R.DURATION
     n = int(dur * SR)
-    stems = score.render_stems(dur)
-    gains = {'piano': 1.0, 'strings': .9, 'perc': .95, 'choir': .55}
-    sends = {'piano': .25, 'strings': .35, 'perc': .18, 'choir': .5}
+    if os.environ.get('VSCO') or os.environ.get('ORCH'):
+        import orchestra                                    # 실제 오케스트라 녹음 샘플 (VSCO 2 CE, CC0)
+        stems = orchestra.render_stems(dur)
+        gains = {'piano': .9, 'strings': 1.0, 'perc': 1.0, 'choir': .8, 'brass': .9, 'color': .8}
+        sends = {'piano': .2, 'strings': .22, 'perc': .15, 'choir': .25, 'brass': .2, 'color': .35}
+    else:
+        stems = score.render_stems(dur)                     # 사운드폰트 (GeneralUser GS)
+        gains = {'piano': 1.0, 'strings': .9, 'perc': .95, 'choir': .55, 'brass': .6, 'color': .6}
+        sends = {'piano': .25, 'strings': .35, 'perc': .18, 'choir': .5, 'brass': .35, 'color': .4}
     dry = np.zeros((2, n))
     send = np.zeros(n)
     for k, st in stems.items():
