@@ -42,3 +42,12 @@ Higgsfield 작업 공간에서 했고, 작업 저장소 환경에서는 Higgsfie
 - 날짜 카드에 출처 표기: 민주화운동기념사업회 오픈아카이브 「민주화운동 일지」
 - 나머지는 v1.2와 같음 (음악에 맞춘 편집, 작곡 음악, 본명조+Pretendard)
 - https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/f9b0e8da-da4c-42c6-9ccf-cf57c98512d1.mp4
+
+## 부마민주항쟁 숏츠 v1.4 — 끊김 해결 + 오케스트라 음악 (최종)
+- 끊김 원인: 60fps 변환본 3개(yusin·draw·sign)가 실제로는 30fps 내용이 두 장씩 반복 → 0.5배 슬로모션에서 초당 15장처럼 보임.
+  원래 속도로 바꿔 모든 프레임이 새 그림 (홀짝 프레임 변화량 비: v1.3 최대 23배 → v1.4 1.0~1.14)
+- 용량: 23.5Mbps → 9.0Mbps (휴대폰 스트리밍 버퍼링 방지), 박자 줌 펄스를 부드럽게
+- 음악: VSCO 2 Community Edition(CC0, 실제 오케스트라 녹음 샘플)로 연주 — 현악 섹션·콘트라베이스·호른·트럼펫·트롬본·튜바·
+  팀파니·큰북·심벌·공·업라이트 피아노·하프·글로켄슈필. 전환에 트럼펫 팡파르와 공, 몽타주에 호른 선율, 대사에 하프, 엔딩에 글로켄슈필
+- 재현: `VSCO=<VSCO-2-CE 폴더> python3 docu/render.py <영상 폴더> out.mp4` (소리만 바꿀 때: `... out.mp4 --remux <기존.mp4>`)
+- https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/3026225b-53aa-4639-9a0b-e6f8131aa34c.mp4
