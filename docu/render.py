@@ -391,6 +391,8 @@ class Reader:
         fn, fps = SRC[key]
         cap = self.caps.get(key)
         if cap is None:
+            for other in list(self.caps):                 # 메모리 절약: 지금 쓰는 영상 하나만 열어 둔다
+                self.caps.pop(other)[0].release()
             cap = self.caps[key] = [cv2.VideoCapture(os.path.join(self.root, fn)), -1]
         if idx != cap[1] + 1:
             cap[0].set(cv2.CAP_PROP_POS_FRAMES, idx)
@@ -512,7 +514,7 @@ def render_frame(i):
     return np.array(base.convert('RGB')).tobytes()
 
 
-def main(root, out, workers=os.cpu_count()):
+def main(root, out, workers=int(os.environ.get('WORKERS', max(1, (os.cpu_count() or 2) - 2)))):
     global _ROOT
     _ROOT = root
     tmp = out + '.video.mp4'
@@ -523,7 +525,7 @@ def main(root, out, workers=os.cpu_count()):
     from multiprocessing import Pool
     CH = 20  # 연속 구간 단위로 나눠 순차 읽기 유지
     step = workers * CH  # 한 번에 이만큼만 메모리에 둔다 (imap은 결과가 쌓여 OOM)
-    with Pool(workers) as pool:
+    with Pool(workers, maxtasksperchild=4) as pool:      # 워커를 주기적으로 새로 띄워 메모리 누적 방지
         for b in range(0, n, step):
             for fr in pool.map(render_frame, range(b, min(n, b + step)), chunksize=CH):
                 p.stdin.write(fr)
