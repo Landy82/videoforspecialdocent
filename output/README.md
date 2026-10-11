@@ -36,3 +36,9 @@ Higgsfield 작업 공간에서 했고, 작업 저장소 환경에서는 Higgsfie
 - 폰트: 본명조(Noto Serif KR) 제목 + Pretendard 본문·가는 숫자 (docu/fonts2, OFL)
 - 50초 · 1080×1920 30fps
 - https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/c1603d4f-e27c-4d74-bdd1-51baad8ab88d.mp4
+
+## 부마민주항쟁 숏츠 v1.3 — 사실 수정
+- 10.19 카드: 「마산으로 번진 시위」 → 「마산 시민 수천 명 / 반정부 시위」 (마산 확산은 10.18 — 민주화운동기념사업회 오픈아카이브 「민주화운동 일지」 BRR_1979_10_18_n004·n005, BRR_1979_10_19_n002 기준)
+- 날짜 카드에 출처 표기: 민주화운동기념사업회 오픈아카이브 「민주화운동 일지」
+- 나머지는 v1.2와 같음 (음악에 맞춘 편집, 작곡 음악, 본명조+Pretendard)
+- https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/f9b0e8da-da4c-42c6-9ccf-cf57c98512d1.mp4
