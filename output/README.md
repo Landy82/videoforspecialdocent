@@ -51,3 +51,10 @@ Higgsfield 작업 공간에서 했고, 작업 저장소 환경에서는 Higgsfie
   팀파니·큰북·심벌·공·업라이트 피아노·하프·글로켄슈필. 전환에 트럼펫 팡파르와 공, 몽타주에 호른 선율, 대사에 하프, 엔딩에 글로켄슈필
 - 재현: `VSCO=<VSCO-2-CE 폴더> python3 docu/render.py <영상 폴더> out.mp4` (소리만 바꿀 때: `... out.mp4 --remux <기존.mp4>`)
 - https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/3026225b-53aa-4639-9a0b-e6f8131aa34c.mp4
+
+## 부마민주항쟁 숏츠 v1.5 — 보라 키컬러 · Pretendard · 타자기
+- 키컬러 #62579F (그래픽), 글자·커서에는 같은 보라의 밝은 톤 #ACA2E8
+- 폰트: Pretendard 한 가족으로 통일 (제목 Bold · 본문 Medium · 숫자 Light/Thin)
+- 0~25초: 날짜·제목·부제가 32분음표마다 한 글자씩 찍히는 타자기 효과 + 깜빡이는 보라 커서 + 같은 시각의 타자기 소리(161타)
+- 음악·끊김 수정은 v1.4와 같음 (VSCO 2 CE 오케스트라, 9Mbps)
+- https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/96ed916c-44a8-4d3d-b031-3425beb86d76.mp4
