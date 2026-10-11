@@ -1,7 +1,9 @@
-"""부마민주항쟁 × 특별도슨트 홍보 숏폼 v1.1 (실물 영상만 사용)
+"""부마민주항쟁 × 특별도슨트 홍보 숏폼 v1.2 (실물 영상만 사용)
 - 촬영 영상(1080×1920 변환본) 위에 키네틱 타이포·날짜 그래픽만 얹는다. AI 생성 이미지·영상 없음.
-- 폰트(모두 OFL 오픈 라이선스, docu/fonts): Hahmlet(제목) · IBM Plex Sans KR(본문) · Anton(숫자)
-- 사운드: docu/sound.py 가 코드로 직접 합성한 사운드트랙 + 마지막 배우 원음 대사 한 줄
+- 음악에 맞춘 편집: 96BPM(1마디 2.5초) 격자 위에 모든 컷, 글자 등장, 줌 펄스가 박자에 떨어진다.
+- 폰트(OFL, docu/fonts2): 본명조 Noto Serif KR(제목) · Pretendard(본문, 가는 숫자)
+- 사운드: docu/score.py 작곡(오픈 사운드폰트 악기) + docu/sound.py 효과음·믹스 + 마지막 배우 원음 대사 한 줄
+- 기록 사진: ARCHIVE_DIR 의 이미지를 kind='archive' 컷으로 넣을 수 있다 (사용 권한을 확인한 자료만)
   python3 docu/render.py <영상 폴더> <출력.mp4>
 """
 import math, os, subprocess, sys
@@ -15,13 +17,15 @@ SAFE_L, SAFE_R, SAFE_T, SAFE_B = 60, 930, 250, 1520
 ACCENT = (232, 73, 42)
 PAPER = (237, 230, 216)
 WHITE = (255, 255, 255)
-FONT_DIR = os.environ.get('FONT_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts'))
-F_HEAD = os.path.join(FONT_DIR, 'Hahmlet-800.ttf')
-F_HEAD_M = os.path.join(FONT_DIR, 'Hahmlet-500.ttf')
-F_SANS = os.path.join(FONT_DIR, 'IBMPlexSansKR-SemiBold.ttf')
-F_SANS_M = os.path.join(FONT_DIR, 'IBMPlexSansKR-Medium.ttf')
-F_SANS_B = os.path.join(FONT_DIR, 'IBMPlexSansKR-Bold.ttf')
-F_NUM = os.path.join(FONT_DIR, 'Anton-Regular.ttf')
+FONT_DIR = os.environ.get('FONT_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts2'))
+F_HEAD = os.path.join(FONT_DIR, 'NotoSerifKR-700.ttf')
+F_HEAD_M = os.path.join(FONT_DIR, 'NotoSerifKR-500.ttf')
+F_SANS = os.path.join(FONT_DIR, 'Pretendard-SemiBold.otf')
+F_SANS_M = os.path.join(FONT_DIR, 'Pretendard-Medium.otf')
+F_SANS_B = os.path.join(FONT_DIR, 'Pretendard-Bold.otf')
+F_NUM = os.path.join(FONT_DIR, 'Pretendard-Light.otf')     # 가는 숫자
+F_THIN = os.path.join(FONT_DIR, 'Pretendard-Thin.otf')     # 배경의 거대한 숫자
+ARCHIVE_DIR = os.environ.get('ARCHIVE_DIR', 'archive')
 
 # ── 소스 (변환본 파일명, 원본 fps) ──────────────────────
 SRC = {
@@ -34,33 +38,41 @@ SRC = {
 }
 
 # ── 타임라인: (시작초, 끝초, 소스, 소스시작초, 속도, 카드) ──────────
-# 카드 종류: hook / date / day / turn / montage / voice / cta
+# 카드 종류: hook / date / day / build / turn / montage / voice / cta / archive
+# 음악 격자: 96BPM → 1박 0.625초, 1마디 2.5초. 컷은 모두 마디(몽타주는 2박) 위에 있다
+BPM = 96
+BEAT = 60 / BPM
+BAR = 4 * BEAT
 DAYS = ['16', '17', '18', '19', '20']
-HOOK_D = (.25, 1.05)   # 훅 두 줄 타이핑 시작(초) — sound.py 타자음과 공유
-CPS = 14               # 타이핑 속도(글자/초)
-CTA_D = dict(label=.25, title=.6, rule=1.35, l3=1.5, l4=1.8, shine=2.3)  # 엔딩 등장 시각(초)
+CPS = 8 / BEAT                         # 타이핑: 32분음표마다 한 글자
+HOOK_D = (BEAT / 2, 2 * BEAT)          # 훅 두 줄 타이핑 시작 — sound.py 타자음과 공유
+CTA_D = dict(label=.5 * BEAT, title=1 * BEAT, rule=1.75 * BEAT, l3=2 * BEAT, l4=3 * BEAT, shine=4 * BEAT)  # 엔딩 등장(박)
+_M = 2 * BEAT                          # 몽타주 컷 길이(2박)
 SHOTS = [
-    (0.0, 3.0, 'yusin', 14.0, .5, dict(kind='hook', l1='1979년 10월,', l2='부산과 마산에서')),
-    (3.0, 5.5, 'spot', 18.0, 1, dict(kind='date', date='1972. 10', text='유신헌법 선포')),
-    (5.5, 8.0, 'yusin', 22.0, .5, dict(kind='date', date='1975. 05', text='긴급조치 9호', sub='집회와 시위 금지')),
-    (8.0, 10.5, 'spot', 40.0, 1, dict(kind='date', date='1979. 10. 04', text='김영삼 의원', sub='국회의원직 제명')),
-    (10.5, 14.0, 'draw', 36.0, .5, dict(kind='day', day=0, place='부산', text='부산대에서', sub='시위가 시작되다')),
-    (14.0, 17.0, 'draw', 3.0, .5, dict(kind='day', day=1, place='부산', text='시민들이', sub='거리로')),
-    (17.0, 20.0, 'yusin', 16.0, .5, dict(kind='day', day=2, place='부산', text='0시,', sub='비상계엄 선포')),
-    (20.0, 23.0, 'woman', 45.0, 1, dict(kind='day', day=3, place='마산', text='마산으로', sub='번진 시위')),
-    (23.0, 26.0, 'spot', 91.0, 1, dict(kind='day', day=4, place='마산·창원', text='정오,', sub='위수령 발동')),
-    (26.0, 29.5, 'draw', 64.0, .5, dict(kind='date', date='1979. 10. 26', text='18년 유신체제의 끝')),
-    (29.5, 32.0, 'sign', 38.0, .5, dict(kind='turn', l1='그 역사를,', l2='몸으로 기억하다')),
-    (32.0, 33.5, 'woman', 68.0, 1, dict(kind='montage', word='춤으로')),
-    (33.5, 35.0, 'spot', 60.0, 1, dict(kind='montage', word='만나는')),
-    (35.0, 36.5, 'sign', 15.0, .5, dict(kind='montage', word='민주화운동의', size=124)),
-    (36.5, 38.0, 'draw', 57.0, .5, dict(kind='montage', word='역사')),
-    (38.0, 40.0, 'woman', 77.0, 1, dict(kind='montage', word='특별도슨트', accent=True)),
-    (40.0, 45.5, 'final', 29.6, 1, dict(kind='voice', text='"우리가 대한민국의 주인입니다."')),
-    (45.5, 52.0, 'final', 35.1, 1, dict(kind='cta')),
+    (0 * BAR, 1 * BAR, 'yusin', 14.0, .5, dict(kind='hook', l1='1979년 10월,', l2='부산과 마산에서')),
+    (1 * BAR, 2 * BAR, 'spot', 18.0, 1, dict(kind='date', date='1972. 10', text='유신헌법 선포')),
+    (2 * BAR, 3 * BAR, 'yusin', 22.0, .5, dict(kind='date', date='1975. 05', text='긴급조치 9호', sub='집회와 시위 금지')),
+    (3 * BAR, 4 * BAR, 'spot', 40.0, 1, dict(kind='date', date='1979. 10. 04', text='김영삼 의원', sub='국회의원직 제명')),
+    (4 * BAR, 5 * BAR, 'draw', 36.0, .5, dict(kind='day', day=0, place='부산', text='부산대에서', sub='시위가 시작되다')),
+    (5 * BAR, 6 * BAR, 'draw', 3.0, .5, dict(kind='day', day=1, place='부산', text='시민들이', sub='거리로')),
+    (6 * BAR, 7 * BAR, 'yusin', 16.0, .5, dict(kind='day', day=2, place='부산', text='0시,', sub='비상계엄 선포')),
+    (7 * BAR, 8 * BAR, 'woman', 45.0, 1, dict(kind='day', day=3, place='마산', text='마산으로', sub='번진 시위')),
+    (8 * BAR, 9 * BAR, 'spot', 91.0, 1, dict(kind='day', day=4, place='마산·창원', text='정오,', sub='위수령 발동')),
+    (9 * BAR, 10 * BAR, 'draw', 64.0, .5, dict(kind='date', date='1979. 10. 26', text='18년 유신체제의 끝')),
+    (10 * BAR, 11 * BAR, 'draw', 64.0 + BAR * .5, .5, dict(kind='build')),
+    (11 * BAR, 12 * BAR, 'sign', 38.0, .5, dict(kind='turn', l1='그 역사를,', l2='몸으로 기억하다')),
+    (12 * BAR + 0 * _M, 12 * BAR + 1 * _M, 'woman', 68.0, 1, dict(kind='montage', word='춤으로')),
+    (12 * BAR + 1 * _M, 12 * BAR + 2 * _M, 'spot', 60.0, 1, dict(kind='montage', word='만나는')),
+    (12 * BAR + 2 * _M, 12 * BAR + 3 * _M, 'sign', 15.0, .5, dict(kind='montage', word='민주화운동의', size=124)),
+    (12 * BAR + 3 * _M, 12 * BAR + 4 * _M, 'draw', 57.0, .5, dict(kind='montage', word='역사')),
+    (12 * BAR + 4 * _M, 12 * BAR + 5 * _M, 'woman', 77.0, 1, dict(kind='montage', word='특별도슨트', accent=True)),
+    (12 * BAR + 5 * _M, 17 * BAR, 'final', 29.6, 1, dict(kind='voice', text='"우리가 대한민국의 주인입니다."')),
+    (17 * BAR, 20 * BAR, 'final', 35.1, 1, dict(kind='cta')),
 ]
+# 기록 사진 넣기 예: SHOTS 에서 한 컷을 아래처럼 바꾼다 (ARCHIVE_DIR/파일, 출처 표기 필수)
+#   (5 * BAR, 6 * BAR, None, 0, 1, dict(kind='archive', img='1979_busan.jpg', caption='1979. 10. 17 부산', credit='사진: 소장처'))
 DURATION = SHOTS[-1][1]
-VOICE = (40.0, 'final', 29.6, 5.4)  # (영상 시각, 소스, 소스 시작, 길이) — 원음 사용 구간
+VOICE = (12 * BAR + 5 * _M, 'final', 29.6, 5.4)  # (영상 시각, 소스, 소스 시작, 길이) — 원음 사용 구간
 
 
 # ── 이징 ─────────────────────────────────────────
@@ -197,12 +209,11 @@ def roll(c, txt, path, size, x, y, t, delay=0., fill=WHITE, stagger=.06, dur=.7,
 
 @lru_cache(maxsize=None)
 def outline_text(txt, size, alpha):
-    """배경용 거대한 외곽선 숫자 (Anton)"""
-    f = font(F_NUM, size)
-    bb = f.getbbox(txt, stroke_width=3)
+    """배경용 거대한 숫자 (Pretendard Thin — 가는 선 자체가 윤곽처럼 보인다)"""
+    f = font(F_THIN, size)
+    bb = f.getbbox(txt)
     im = Image.new('RGBA', (bb[2] - bb[0] + 20, bb[3] - bb[1] + 20), (0, 0, 0, 0))
-    ImageDraw.Draw(im).text((10 - bb[0], 10 - bb[1]), txt, font=f, fill=(0, 0, 0, 0),
-                            stroke_width=3, stroke_fill=(255, 255, 255, alpha))
+    ImageDraw.Draw(im).text((10 - bb[0], 10 - bb[1]), txt, font=f, fill=(255, 255, 255, alpha))
     return im
 
 
@@ -224,38 +235,39 @@ def giant(c, txt, size, lt, dur, y, alpha=60):
 def day_bar(c, cur, place, t):
     """10.16 → 10.20 진행 그래픽: 선이 다음 날짜로 달려가고 현재 날짜가 굴러와 멈춘다"""
     x0, ly, step = SAFE_L + 30, SAFE_T + 200, 170
-    kinetic(c, '1979. 10.', F_SANS, 32, x0 - 8, SAFE_T + 6, 99, fill=(225, 225, 225))
+    kinetic(c, '1979. 10.', F_SANS, 30, x0 - 8, SAFE_T + 6, 99, fill=(225, 225, 225), track=4)
     d = ImageDraw.Draw(c)
     d.line([(x0, ly), (x0 + step * 4, ly)], fill=(255, 255, 255, 90), width=3)
-    prog = ease_io(t / .55)
+    prog = ease_io(t / BEAT)
     xe = x0 + step * (cur - 1 + prog) if cur > 0 else x0
     d.line([(x0, ly), (xe, ly)], fill=ACCENT + (255,), width=7)
     for i, dd in enumerate(DAYS):
         cx = x0 + step * i
         if i == cur:
-            r = 15 * max(back((t - .4) / .45, 2.6), 0)
-            ring = ease((t - .4) / .8)
-            if t > .4:
+            r = 15 * max(back((t - BEAT) / .45, 2.6), 0)
+            ring = ease((t - BEAT) / .8)
+            if t > BEAT:
                 rr = 15 + 40 * ring
                 d.ellipse([cx - rr, ly - rr, cx + rr, ly + rr], outline=ACCENT + (int(255 * (1 - ring)),), width=4)
             col, sz = ACCENT, 76
         else:
-            r, col, sz = 8, (WHITE if i < cur else (140, 140, 140)), 48
+            r, col, sz = 8, (WHITE if i < cur else (140, 140, 140)), 42
         if r > 0:
             d.ellipse([cx - r, ly - r, cx + r, ly + r], fill=col + (255,))
-        tw = line_width(dd, F_NUM, sz)
+        fnt = F_NUM if i == cur else F_SANS
+        tw = line_width(dd, fnt, sz)
         if i == cur:
-            roll(c, dd, F_NUM, sz, cx - tw / 2, ly - 22 - sz * 1.45, t, .35, fill=ACCENT, steps=5, dur=.55)
+            roll(c, dd, fnt, sz, cx - tw / 2, ly - 22 - sz * 1.3, t, BEAT / 2, fill=ACCENT, steps=5, dur=.55)
         else:
-            kinetic(c, dd, F_NUM, sz, cx - tw / 2, ly - 18 - sz * 1.45, 99, fill=col, shadow=False)
+            kinetic(c, dd, fnt, sz, cx - tw / 2, ly - 18 - sz * 1.3, 99, fill=col, shadow=False)
     # 장소 태그: 레드오렌지 블록이 쓸고 지나가며 종이색 태그를 남김
-    tag_w = line_width(place, F_SANS_B, 42) + 40
+    tag_w = line_width(place, F_SANS_B, 40) + 40
     ty = ly + 44
     wp = ease((t - .15) / .3)
     wo = ease((t - .45) / .3)
     if t > .45:
         bar(c, x0 - 10, ty, tag_w * wo, 66, PAPER)
-        kinetic(c, place, F_SANS_B, 42, x0 + 10, ty + 2, t, .5, fill=(20, 19, 18), stagger=.03, dur=.25, style='fade', shadow=False)
+        kinetic(c, place, F_SANS_B, 40, x0 + 10, ty + 4, t, .5, fill=(20, 19, 18), stagger=.03, dur=.25, style='fade', shadow=False)
     bar(c, x0 - 10 + tag_w * wo, ty, tag_w * (wp - wo), 66, ACCENT)
 
 
@@ -281,50 +293,60 @@ def overlay(card, t, shot_t0, shot_t1):
     c = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     k = card['kind']
     if k == 'hook':
-        giant(c, '1979', 520, lt, dur, 330, 70)
-        lw = line_width('부마민주항쟁', F_SANS_B, 36) + 36
-        bar(c, SAFE_L + 20, SAFE_T + 20, lw * ease(lt / .3), 60, ACCENT)
-        kinetic(c, '부마민주항쟁', F_SANS_B, 36, SAFE_L + 38, SAFE_T + 26, lt, .2, stagger=.03, dur=.3, shadow=False)
+        giant(c, '1979', 560, lt, dur, 330, 60)
+        lw = line_width('부마민주항쟁', F_SANS, 30, 6) + 40
+        bar(c, SAFE_L + 20, SAFE_T + 20, lw * ease(lt / .3), 58, ACCENT)
+        kinetic(c, '부마민주항쟁', F_SANS, 30, SAFE_L + 40, SAFE_T + 28, lt, .15, stagger=.03, dur=.3, shadow=False, track=6)
+        out = dur - BEAT / 2
         for li, (txt, y) in enumerate(((card['l1'], 1080), (card['l2'], 1225))):
             d0 = HOOK_D[li]
-            kinetic(c, txt, F_HEAD, 112, SAFE_L + 20, y, lt, d0, stagger=1 / CPS, dur=.12, style='pop', out=dur - .35)
+            kinetic(c, txt, F_HEAD, 108, SAFE_L + 20, y, lt, d0, stagger=1 / CPS, dur=.12, style='pop', out=out, track=-2)
             n = min(len(txt), int(max(0, lt - d0) * CPS))
-            active = lt > d0 and (li == 1 or lt < HOOK_D[1]) and lt < dur - .35
-            if active and (n < len(txt) or int(lt * 4) % 2 == 0):  # 깜빡이는 커서
-                bar(c, SAFE_L + 28 + line_width(txt[:n], F_HEAD, 112), y + 18, 9, 118, ACCENT)
+            active = lt > d0 and (li == 1 or lt < HOOK_D[1]) and lt < out
+            if active and (n < len(txt) or int(lt / BEAT * 2) % 2 == 0):  # 8분음표마다 깜빡이는 커서
+                bar(c, SAFE_L + 28 + line_width(txt[:n], F_HEAD, 108, -2), y + 22, 6, 120, ACCENT)
     elif k == 'date':
-        out = dur - .3
-        giant(c, card['date'][:4], 470, lt, dur, 300, 55)
-        y0 = 1060
-        nw = line_width(card['date'], F_NUM, 96) + 44
-        wb, wo = ease(lt / .28), ease((lt - out) / .25)
-        bar(c, SAFE_L + 20 + nw * wo, y0, nw * (wb - wo), 128, ACCENT)
-        roll(c, card['date'], F_NUM, 96, SAFE_L + 42, y0 + 4, lt, .12, out=out)
-        kinetic(c, card['text'], F_HEAD, 98, SAFE_L + 20, y0 + 160, lt, .3, out=out)
+        out = dur - BEAT / 2
+        giant(c, card['date'][:4], 500, lt, dur, 300, 55)
+        y0 = 1040
+        wb, wo = ease(lt / (BEAT / 2)), ease((lt - out) / .25)
+        bar(c, SAFE_L + 22 + 64 * wo, y0, 64 * (wb - wo), 5, ACCENT)               # 박에 그어지는 짧은 선
+        roll(c, card['date'], F_NUM, 112, SAFE_L + 18, y0 + 26, lt, .05, out=out)
+        kinetic(c, card['text'], F_HEAD, 92, SAFE_L + 20, y0 + 190, lt, BEAT / 2, out=out, track=-2)
         if card.get('sub'):
-            kinetic(c, card['sub'], F_SANS_M, 50, SAFE_L + 24, y0 + 300, lt, .5, fill=(230, 230, 230), stagger=.025, out=out)
+            kinetic(c, card['sub'], F_SANS_M, 46, SAFE_L + 24, y0 + 318, lt, BEAT, fill=(225, 225, 225), stagger=.025, out=out, track=1)
     elif k == 'day':
-        out = dur - .3
-        giant(c, DAYS[card['day']], 760, lt, dur, 470, 50)
+        out = dur - BEAT / 2
+        giant(c, DAYS[card['day']], 820, lt, dur, 470, 50)
         day_bar(c, card['day'], card['place'], lt)
-        kinetic(c, card['text'], F_HEAD, 104, SAFE_L + 20, 1160, lt, .25, out=out)
-        kinetic(c, card['sub'], F_HEAD, 104, SAFE_L + 20, 1295, lt, .45, out=out)
+        kinetic(c, card['text'], F_HEAD, 100, SAFE_L + 20, 1160, lt, BEAT / 2, out=out, track=-2)
+        kinetic(c, card['sub'], F_HEAD, 100, SAFE_L + 20, 1295, lt, BEAT, out=out, track=-2)
+    elif k == 'build':
+        # 10.26 이후 한 마디: 글자 없이 박마다 하나씩 켜지는 네 개의 선 (빌드업 카운트)
+        cx = (SAFE_L + SAFE_R) / 2
+        for b in range(4):
+            on = ease((lt - b * BEAT) / .12)
+            if on > 0:
+                bar(c, cx - 150 + b * 80, 1380, 60, 5, ACCENT if b == 3 else WHITE, on * (.55 + .45 * (b == int(lt / BEAT))))
+    elif k == 'archive':
+        kinetic(c, card.get('caption', ''), F_SANS_M, 40, SAFE_L + 20, 1350, lt, BEAT / 2, fill=WHITE, out=dur - BEAT / 2)
+        kinetic(c, card.get('credit', ''), F_SANS_M, 26, SAFE_L + 20, 1410, lt, BEAT, fill=(200, 200, 200), out=dur - BEAT / 2)
     elif k == 'turn':
-        kinetic(c, card['l1'], F_HEAD_M, 92, SAFE_L + 20, 1110, lt, .15, stagger=.05)
-        w2 = kinetic(c, card['l2'], F_HEAD, 120, SAFE_L + 20, 1235, lt, .6, fill=PAPER, stagger=.06, style='pop')
-        bar(c, SAFE_L + 22, 1235 + asc(F_HEAD, 120) + 34, w2 * ease_io((lt - 1.3) / .5), 8, ACCENT)
+        kinetic(c, card['l1'], F_HEAD_M, 88, SAFE_L + 20, 1110, lt, .05, stagger=.05, track=-2)
+        w2 = kinetic(c, card['l2'], F_HEAD, 116, SAFE_L + 20, 1235, lt, BEAT, fill=PAPER, stagger=.06, style='pop', track=-3)
+        bar(c, SAFE_L + 22, 1235 + asc(F_HEAD, 116) + 34, w2 * ease_io((lt - 2 * BEAT) / .5), 6, ACCENT)
     elif k == 'montage':
-        kinetic(c, '민주화운동기념관 특별도슨트', F_SANS, 34, SAFE_L + 20, SAFE_T + 24, 99, fill=PAPER)
-        sz = card.get('size', 156)
+        kinetic(c, '민주화운동기념관 특별도슨트', F_SANS, 30, SAFE_L + 20, SAFE_T + 24, 99, fill=PAPER, track=4)
+        sz = card.get('size', 150)
         acc = card.get('accent')
         cx = (SAFE_L + SAFE_R) / 2
         ww = kinetic(c, card['word'], F_HEAD, sz, cx, 1180, lt, .02, fill=ACCENT if acc else WHITE, stagger=.045,
-                     dur=.35, style='pop', align='center', out=None if acc else dur - .18)
-        u = ease_io((lt - .25) / .35) * (1 if acc else 1 - ease((lt - dur + .2) / .2))
+                     dur=.35, style='pop', align='center', out=None if acc else dur - .18, track=-3)
+        u = ease_io((lt - BEAT / 2) / .3) * (1 if acc else 1 - ease((lt - dur + .2) / .2))
         bar(c, cx - ww / 2 * u, 1180 + asc(F_HEAD, sz) + 36, ww * u, 6, PAPER if acc else ACCENT)
     elif k == 'voice':
-        kinetic(c, card['text'], F_HEAD_M, 58, (SAFE_L + SAFE_R) / 2, 1330, lt, .2, stagger=.03, dur=.4, align='center',
-                out=dur - .4)
+        kinetic(c, card['text'], F_HEAD_M, 56, (SAFE_L + SAFE_R) / 2, 1330, lt, .2, stagger=.03, dur=.4, align='center',
+                out=dur - .4, track=-1)
     elif k == 'cta':
         cx = (SAFE_L + SAFE_R) / 2
         # 먼지 입자: 천천히 떠오르며 반짝임
@@ -335,24 +357,24 @@ def overlay(card, t, shot_t0, shot_t1):
             a = (.25 + .35 * (.5 + .5 * math.sin(lt * (1 + 2 * sp) + ph * 6.28))) * fade_in
             r = 1 + 2.5 * sz
             d.ellipse([px * W - r, y - r, px * W + r, y + r], fill=(255, 255, 255, int(255 * a * .6)))
-        kinetic(c, '민주화운동기념관', F_SANS, 44, cx, 690, lt, CTA_D['label'], stagger=.035, align='center', track=8)
-        tw = kinetic(c, '특별도슨트', F_HEAD, 128, cx, 775, lt, CTA_D['title'], stagger=.07, dur=.55, align='center')
+        kinetic(c, '민주화운동기념관', F_SANS, 40, cx, 690, lt, CTA_D['label'], stagger=.035, align='center', track=10)
+        tw = kinetic(c, '특별도슨트', F_HEAD, 124, cx, 768, lt, CTA_D['title'], stagger=.07, dur=.55, align='center', track=-2)
         # 빛 반사: 대각선 레드오렌지 빛이 제목을 훑고 지나감
         sp = (lt - CTA_D['shine']) / .8
         if 0 < sp < 1:
-            m = line_alpha('특별도슨트', F_HEAD, 128)
-            pad = int(128 * .3)
+            m = line_alpha('특별도슨트', F_HEAD, 124)
+            pad = int(124 * .3)
             yy, xx = np.mgrid[0:m.shape[0], 0:m.shape[1]]
             pos = -150 + (m.shape[1] + 300) * ease_io(sp)
             band = np.exp(-((xx + yy * .35 - pos) ** 2) / (2 * 45 ** 2))
             arr = np.zeros(m.shape + (4,), np.uint8)
             arr[..., :3] = ACCENT
             arr[..., 3] = (m * band * 255).astype(np.uint8)
-            c.alpha_composite(Image.fromarray(arr), (int(cx - tw / 2 - pad), int(775 - pad)))
+            c.alpha_composite(Image.fromarray(arr), (int(cx - tw / 2 - pad), int(768 - pad)))
         u = ease_io((lt - CTA_D['rule']) / .45)
         bar(c, cx - 70 * u, 990, 140 * u, 5, ACCENT)
-        kinetic(c, '매주 금토일', F_SANS_B, 60, cx, 1040, lt, CTA_D['l3'], stagger=.045, align='center')
-        kinetic(c, '오후 3시', F_SANS_B, 60, cx, 1130, lt, CTA_D['l4'], stagger=.045, align='center')
+        kinetic(c, '매주 금토일', F_SANS_M, 56, cx, 1040, lt, CTA_D['l3'], stagger=.045, align='center', track=2)
+        kinetic(c, '오후 3시', F_SANS_M, 56, cx, 1124, lt, CTA_D['l4'], stagger=.045, align='center', track=2)
     return c
 
 
@@ -402,6 +424,33 @@ _ACC = np.array(ACCENT, np.float32)[None, None, :] / 255
 _GRAIN = [np.random.default_rng(1979 + k).normal(0, .025, (H // 2, W // 2, 1)).astype(np.float32) for k in range(4)]
 _FLASH = {int(round(sh[0] * FPS)) for sh in SHOTS if sh[5]['kind'] == 'turn'}
 _RD, _ROOT = None, None
+_ARCH = {}
+
+
+def beat_pulse(t, kind):
+    """박마다 화면이 살짝 당겨졌다 풀림 (마디 첫 박은 더 세게) — 음악과 같은 격자"""
+    amp = {'day': .022, 'montage': .03, 'turn': .02, 'build': .016, 'date': .01}.get(kind, 0)
+    if not amp:
+        return 0.0
+    nb = math.floor(t / BEAT + 1e-6)
+    since = t - nb * BEAT
+    if nb % 4 == 0:
+        amp *= 1.8
+    return amp * math.exp(-since * 9)
+
+
+def archive_frame(name, p):
+    """기록 사진: 흑백 + 천천히 다가가기 (Ken Burns)"""
+    if name not in _ARCH:
+        im = cv2.imread(os.path.join(ARCHIVE_DIR, name))
+        if im is None:
+            im = np.zeros((H, W, 3), np.uint8)
+        h, w = im.shape[:2]
+        s = max(W / w, H / h)
+        im = cv2.resize(im, (int(w * s) + 1, int(h * s) + 1), interpolation=cv2.INTER_AREA)
+        y0, x0 = (im.shape[0] - H) // 2, (im.shape[1] - W) // 2
+        _ARCH[name] = cv2.cvtColor(cv2.cvtColor(im[y0:y0 + H, x0:x0 + W], cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
+    return _ARCH[name]
 
 
 def render_frame(i):
@@ -414,17 +463,26 @@ def render_frame(i):
     kind = card['kind']
     k = i - int(round(t0 * FPS))                 # 컷 이후 프레임
     kk = int(round(t1 * FPS)) - 1 - i            # 다음 컷까지 남은 프레임
-    src_fps = SRC[key][1]
-    idx = int(round(st * src_fps + k * speed * src_fps / FPS))
-    f = _RD.frame(key, idx)[..., ::-1]
-    # 컷 전환: 줌 펀치 + 방향 모션블러 (휩)
-    punch = (1 - k / 5) ** 2 if k < 5 and kind not in ('cta', 'turn', 'hook', 'voice') else 0
+    if kind == 'archive':
+        f = archive_frame(card['img'], 0)
+    else:
+        src_fps = SRC[key][1]
+        idx = int(round(st * src_fps + k * speed * src_fps / FPS))
+        f = _RD.frame(key, idx)[..., ::-1]
+    # 컷 전환: 줌 펀치 + 방향 모션블러 (휩) — 컷은 모두 박 위에 있다
+    punch = (1 - k / 5) ** 2 if k < 5 and kind not in ('cta', 'turn', 'hook', 'voice', 'build') else 0
     nxt = SHOTS[si + 1][5]['kind'] if si + 1 < len(SHOTS) else 'cta'
-    whip_out = ((3 - kk) / 3) ** 2 if kk < 3 and nxt not in ('cta', 'voice', 'turn') else 0
+    whip_out = ((3 - kk) / 3) ** 2 if kk < 3 and nxt not in ('cta', 'voice', 'turn', 'build') else 0
     kb = int(80 * max(punch, whip_out))
     if kb > 1:
         f = cv2.blur(np.ascontiguousarray(f), (kb, 1) if si % 2 == 0 else (1, kb))
-    g = grade(f, 1.0 + .07 * (t - t0) / (t1 - t0) + .12 * punch)
+    prog = (t - t0) / (t1 - t0)
+    zoom = 1.0 + .07 * prog + .12 * punch + beat_pulse(t, kind)
+    if kind == 'build':
+        zoom += .16 * prog ** 2                  # 빌드업: 점점 빨리 다가감
+    if kind == 'archive':
+        zoom += .05 * prog
+    g = grade(f, zoom)
     if kind == 'montage' and k < 3:              # 몽타주 컷: RGB 분리
         s = (3 - k) * 8
         g = np.stack([np.roll(g[..., 0], s, 1), g[..., 1], np.roll(g[..., 2], -s, 1)], -1)
@@ -434,6 +492,8 @@ def render_frame(i):
         g = np.broadcast_to(_GLOW * _ACC * (breath * ease((lt - .4) / 1.2)), (H, W, 3)).astype(np.float32)
     else:
         g = scrim(g, top=.5, bottom=.8 if kind != 'montage' else .55)
+        if kind == 'build':                      # 빌드업: 화면이 조금씩 어두워짐
+            g = g * (1 - .45 * ((t - t0) / (t1 - t0)) ** 1.5)
         g = np.clip(g + cv2.resize(_GRAIN[i % 4], (W, H))[..., None], 0, 1)
     if kind in ('montage', 'day') and k < 6:     # 컷마다 가장자리에 붉은 빛번짐
         g = np.clip(g + _EDGE * _ACC * ((1 - k / 6) * (.5 if kind == 'montage' else .3)), 0, 1)

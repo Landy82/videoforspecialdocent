@@ -1,13 +1,10 @@
-"""부마 숏폼 사운드트랙 — 샘플·음원 없이 numpy/scipy 코드로 직접 합성 (저작권 걱정 없음)
-render.py 의 SHOTS 타이밍을 그대로 읽어 컷·글자 등장에 소리를 맞춘다.
+"""부마 숏츠 v1.2 사운드트랙 = 작곡한 배경음악(score.py, 실제 악기 사운드폰트) + 화면에 맞춘 효과음
+render.py 의 SHOTS·박자 격자(96BPM, 1마디 2.5초)를 그대로 읽는다.
 
-  0–3s     훅: 낮은 드론 + 심장박동 + 글자마다 타자음
-  3–29.5s  연표: 시계 초침 + 컷마다 서브 임팩트, 날짜 숫자가 굴러갈 때 틱 소리, 드론이 점점 열림
-           16~20일 구간은 심장박동이 빨라지고, 10.26 뒤로 상승음 → 정적
-  29.5s    화이트 플래시와 함께 큰 임팩트 + 종소리 화음 (그 역사를, 몸으로 기억하다)
-  32–40s   몽타주: 120BPM 비트, 컷마다 화음 전환(Dm–B♭–F–C–Dm) + 아르페지오
-  40–45.5s 배우 원음 대사 아래 아주 작은 패드
-  45.5–52s 엔딩: 부드러운 임팩트 + F장조 패드, 글자가 뜰 때마다 맑은 플럭
+  · 훅 타이핑: 글자마다 타자음 (32분음표 격자)
+  · 5일 구간 시작(10s)·전환(27.5s): 서브 임팩트
+  · 10.26 빌드업: 노이즈 라이저 → 전환 직전 1/8박 완전 정적 → 터짐
+  · 대사 구간: 음악을 줄여(덕킹) 배우 목소리가 앞에 오게
   python3 docu/sound.py out.wav
 """
 import math, os, sys, wave
@@ -170,15 +167,24 @@ def reverb_ir(d=2.6, decay=2.8):
     return ir / np.sqrt((ir ** 2).sum(axis=1, keepdims=True))
 
 
-# ── 편곡 ────────────────────────────────────────────
+# ── 믹스 ────────────────────────────────────────────
 def build(path):
-    n = int(R.DURATION * SR) + SR
+    import score
+    dur = R.DURATION
+    n = int(dur * SR)
+    stems = score.render_stems(dur)
+    gains = {'piano': 1.0, 'strings': .9, 'perc': .95, 'choir': .55}
+    sends = {'piano': .25, 'strings': .35, 'perc': .18, 'choir': .5}
     dry = np.zeros((2, n))
     send = np.zeros(n)
+    for k, st in stems.items():
+        x = st[:n].T.astype(np.float64) * gains[k]
+        dry += x
+        send += x.mean(axis=0) * sends[k]
 
     def add(sig, t, g=1.0, pan=0.0, rev=0.0):
         i = int(round(t * SR))
-        if i >= n or g == 0:
+        if i >= n:
             return
         s = sig[:n - i] * g
         a = (pan + 1) * math.pi / 4
@@ -186,119 +192,39 @@ def build(path):
         dry[1, i:i + len(s)] += s * math.sin(a) * 1.414
         send[i:i + len(s)] += s * rev
 
-    shots = R.SHOTS
-    turn_t = next(s[0] for s in shots if s[5]['kind'] == 'turn')
-    mont_t = next(s[0] for s in shots if s[5]['kind'] == 'montage')
-    voice_t = next(s[0] for s in shots if s[5]['kind'] == 'voice')
-    cta_t = next(s[0] for s in shots if s[5]['kind'] == 'cta')
-
-    # 드론: 처음부터 전환 직전까지, 점점 열리며 커짐 → 직전에 뚝 끊김(정적)
-    dd = turn_t - .08
-    dr = drone(dd)
-    env = np.minimum(1, ts(dd) / 1.2) * (.55 + .45 * ts(dd) / dd)
-    env[-int(.04 * SR):] *= np.linspace(1, 0, int(.04 * SR))
-    add(dr * env / np.abs(dr).max(), 0, .32, rev=.15)
-
-    # 훅: 심장박동 + 타자음 (render.py 의 타이핑 시각과 동일)
-    hook = shots[0][5]
-    for hb in (0.0, 1.1, 2.2):
-        add(heartbeat(), hb, .9)
+    hook = R.SHOTS[0][5]
     for li, txt in enumerate((hook['l1'], hook['l2'])):
         for j, ch in enumerate(txt):
-            add(key_click(), R.HOOK_D[li] + j / R.CPS, .28 if ch != ' ' else .12, pan=-.3 + .6 * j / len(txt), rev=.1)
+            add(key_click(), R.HOOK_D[li] + j / R.CPS, .06 if ch != ' ' else .03, pan=-.3 + .6 * j / len(txt), rev=.1)
+    t_turn = next(s[0] for s in R.SHOTS if s[5]['kind'] == 'turn')
+    t_days = next(s[0] for s in R.SHOTS if s[5]['kind'] == 'day')
+    t_build = next(s[0] for s in R.SHOTS if s[5]['kind'] == 'build')
+    add(sub_hit(1.6, 110, 36, .4), t_days, .22, rev=.2)
+    add(sub_hit(2.6, 140, 32, .8), t_turn, .28, rev=.3)
+    gap = R.BEAT / 8
+    add(riser(t_turn - gap - t_build), t_build, .12, rev=.15)
 
-    # 연표: 초침 + 컷 임팩트 + 숫자 굴림 틱
-    t = 3.0
-    while t < turn_t - .6:
-        add(tick(2300 if int(t * 2) % 2 else 1700), t, .16, pan=.25 if int(t * 2) % 2 else -.25, rev=.05)
-        t += .5
-    for s0, s1, _, _, _, card in shots:
-        if s0 >= turn_t:
-            break
-        if s0 > 0:
-            add(whoosh(.35), s0 - .3, .22, pan=.4 if int(s0) % 2 else -.4)
-            add(sub_hit(), s0, .75 if card['kind'] == 'date' else .9, rev=.25)
-        if card['kind'] == 'date':
-            digits = sum(ch.isdigit() for ch in card['date'])
-            for j in range(10 + digits * 2):          # 숫자가 굴러가는 동안
-                add(tick(2600 + 300 * (j % 3)), s0 + .12 + j * .045, .09 * (1 - j / (12 + digits * 2)), pan=-.5 + j * .05)
-            add(pluck(note('D5'), .8), s0 + .75, .12, rev=.3)
-        if card['kind'] == 'day':
-            # 날짜가 굴러와 멈추는 순간 '딱' + 빨라지는 심장박동
-            add(tick(3200), s0 + .9, .25, rev=.2)
-            period = 1.0 - .1 * card['day']
-            hb = s0 + .1
-            while hb < s1 - .1:
-                add(heartbeat(), hb, .7 + .08 * card['day'])
-                hb += period
-    # 10.26 → 큰 종 + 상승음 → 정적
-    t26 = shots[9][0]
-    add(bell(note('D3'), 3.5), t26, .45, rev=.4)
-    add(riser(turn_t - .1 - (t26 + .6)), t26 + .6, .45, rev=.2)
-    add(rev_swell(.6), turn_t - .65, .35)
-
-    # 전환: 큰 임팩트 + 종 화음 + Dm 패드
-    add(sub_hit(2.5, 140, 34, .9), turn_t, 1.1, rev=.5)
-    add(filt(noise(1.5), 'low', 5000) * np.exp(-ts(1.5) * 4), turn_t, .25, rev=.6)
-    for nm, dl in (('D4', 0), ('F4', .06), ('A4', .12), ('D5', .6)):
-        add(bell(note(nm)), turn_t + dl, .28, pan=(-.3, .3, 0, .2)[('D4', 'F4', 'A4', 'D5').index(nm)], rev=.5)
-    add(pad(mont_t - turn_t + .3, ['D3', 'A3', 'F4'], 1600, .6, .4), turn_t, .22, rev=.3)
-    add(pluck(note('A4'), 1.5), turn_t + .6, .2, rev=.4)
-    add(riser(.8), mont_t - .8, .25)
-
-    # 몽타주: 120BPM, 컷마다 화음 전환 + 아르페지오 + 베이스
-    chords = [['D4', 'F4', 'A4', 'D5'], ['Bb3', 'D4', 'F4', 'Bb4'], ['F4', 'A4', 'C5', 'F5'],
-              ['C4', 'E4', 'G4', 'C5'], ['D4', 'F4', 'A4', 'D5']]
-    bass = ['D2', 'Bb1', 'F2', 'C2', 'D2']
-    mshots = [s for s in shots if s[5]['kind'] == 'montage']
-    beat = .5
-    for ci, (s0, s1, *_rest) in enumerate(mshots):
-        ch = chords[ci]
-        add(sub_hit(1.0, 110, 40, .6), s0, .55, rev=.2)
-        if ci:
-            add(whoosh(.3), s0 - .25, .2, pan=.5 if ci % 2 else -.5)
-        add(pad(s1 - s0 + .2, ch[:3], 2200, .05, .2), s0, .16, rev=.3)
-        nb = int(round((s1 - s0) / beat))
-        for b in range(nb):
-            bt = s0 + b * beat
-            add(kick(), bt, .62)
-            add(hat(), bt + beat / 2, .16, pan=.3)
-            if (int(round((bt - mont_t) / beat))) % 2 == 1:
-                add(clap(), bt, .4, rev=.3)
-            add(pluck(note(bass[ci]), .45, .6), bt + beat / 2, .35)
-        steps = int(round((s1 - s0) / (beat / 4)))
-        for j in range(steps):
-            idx = (0, 1, 2, 3, 2, 1, 2, 3)[j % 8]
-            add(pluck(note(ch[idx]), .6, 1.4), s0 + j * beat / 4, .12, pan=(-.4, -.1, .2, .45)[idx], rev=.35)
-
-    # 대사: 작은 패드만 (B♭ → F)
-    add(pad(2.9, ['Bb2', 'F3', 'D4'], 900, 1.0, 1.2), voice_t, .1, rev=.4)
-    add(pad(3.0, ['F2', 'C4', 'A4'], 900, 1.2, 1.2), voice_t + 2.6, .1, rev=.4)
-    add(bell(note('F5'), 3), voice_t + .1, .08, rev=.5)
-
-    # 엔딩: 부드러운 임팩트 + F장조 패드 + 글자 등장 플럭 + 반짝임
-    add(sub_hit(2.2, 90, 36, .3), cta_t, .7, rev=.6)
-    end_d = R.DURATION - cta_t
-    add(pad(end_d, ['F3', 'C4', 'G4', 'A4'], 1300, 1.2, 1.6), cta_t, .2, rev=.4)
-    D = R.CTA_D
-    for nm, key in (('C5', 'label'), ('F5', 'title'), ('A5', 'l3'), ('C6', 'l4')):
-        add(pluck(note(nm), 1.8, 1.2), cta_t + D[key], .2, rev=.5)
-    add(bell(note('F6'), 3), cta_t + D['title'] + .3, .1, pan=.3, rev=.6)
-    add(whoosh(.5), cta_t + D['rule'] - .15, .12)
-    add(sweep_noise(.9, 3000, 12000, .3) * np.sin(np.pi * ts(.9) / .9) ** 2, cta_t + D['shine'], .08, rev=.5)
-    for j, nm in enumerate(('F6', 'C7', 'A6', 'G6')):
-        add(bell(note(nm), 2.5), cta_t + 3.0 + j * .45, .05, pan=(-.5, .5, -.2, .3)[j], rev=.7)
-
-    # 리버브 + 마스터
-    ir = reverb_ir()
+    ir = reverb_ir(2.8, 2.2)
     wet = np.stack([signal.fftconvolve(send, ir[c])[:n] for c in range(2)])
-    mix = dry + wet * .35
-    mix = filt(mix, 'high', 30)
-    tail = int(1.2 * SR)
-    end = int(R.DURATION * SR)
-    mix = mix[:, :end]
+    mix = dry + wet * .32
+    mix = filt(mix, 'high', 28)
+    # 전환 직전 1/8박 정적
+    g = np.ones(n)
+    a, b = int((t_turn - gap) * SR), int(t_turn * SR)
+    g[a - 240:a] = np.linspace(1, 0, 240); g[a:b] = 0
+    # 대사 구간 덕킹 (-9dB)
+    vt, _, _, vlen = R.VOICE
+    duck = np.ones(n)
+    v0, v1 = int(vt * SR), int((vt + vlen) * SR)
+    ramp = int(.25 * SR)
+    duck[v0 - ramp:v0] = np.linspace(1, .35, ramp); duck[v0:v1] = .35; duck[v1:v1 + ramp] = np.linspace(.35, 1, ramp)
+    # 구간 자동화: 몽타주를 가장 크게, 엔딩은 여유 있게
+    t_m = next(s[0] for s in R.SHOTS if s[5]['kind'] == 'montage')
+    auto = np.interp(np.arange(n) / SR, [0, t_m - .05, t_m, vt - .3, vt], [1, 1, 1.45, 1.45, 1])
+    mix *= g * duck * auto
+    tail = int(1.0 * SR)
     mix[:, -tail:] *= np.linspace(1, 0, tail) ** 1.5
-    mix = np.tanh(mix / np.abs(mix).max() * 1.3) / np.tanh(1.3) * .89
+    mix = np.tanh(mix / np.abs(mix).max() * 1.2) / np.tanh(1.2) * .89
     pcm = (mix.T * 32767).astype(np.int16)
     with wave.open(path, 'wb') as w:
         w.setnchannels(2)
