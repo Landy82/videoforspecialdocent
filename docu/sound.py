@@ -69,6 +69,25 @@ def key_click():
             np.sin(2 * np.pi * (180 + 60 * rng.random()) * t) * np.exp(-t * 70) * .5) * g
 
 
+def typewriter_key(space=False):
+    """기계식 타자기 한 타: 키 누름(딸깍) → 활자가 종이를 때림(금속성 탁) → 몸체 울림. 매번 조금씩 다르게"""
+    d = .16
+    t = ts(d)
+    g = .8 + .35 * rng.random()
+    press = filt(noise(d), 'high', 2500) * np.exp(-t * 1100) * .45
+    off = int((.007 + .006 * rng.random()) * SR)
+    strike = np.zeros_like(t)
+    if not space:
+        n = noise(d)
+        f0 = 2300 * (1 + .07 * rng.standard_normal())
+        body = (filt(n, 'band', [f0 * .9, f0 * 1.1]) * 1.0 + filt(n, 'band', [3900, 4500]) * .7 +
+                filt(n, 'band', [6200, 7400]) * .45)
+        strike[off:] = (body * np.exp(-t * 120))[:len(t) - off] * 1.6
+    thump = filt(noise(d), 'low', 240) * np.exp(-t * 40) * (1.4 if space else .8)
+    x = press + strike + thump
+    return x / (np.abs(x).max() + 1e-9) * g
+
+
 def heartbeat():
     t = ts(.45)
     one = np.sin(2 * np.pi * 52 * t) * np.exp(-t * 16) * (1 - np.exp(-t * 400))
@@ -198,10 +217,9 @@ def build(path):
         dry[1, i:i + len(s)] += s * math.sin(a) * 1.414
         send[i:i + len(s)] += s * rev
 
-    hook = R.SHOTS[0][5]
-    for li, txt in enumerate((hook['l1'], hook['l2'])):
-        for j, ch in enumerate(txt):
-            add(key_click(), R.HOOK_D[li] + j / R.CPS, .06 if ch != ' ' else .03, pan=-.3 + .6 * j / len(txt), rev=.1)
+    # 0~25초 타자기: 화면에 글자가 찍히는 바로 그 시각에 한 타씩 (render.typing_events 와 공유)
+    for j, (tt, ch) in enumerate(R.typing_events()):
+        add(typewriter_key(ch == ' '), tt, .16 if ch != ' ' else .11, pan=-.25 + .5 * ((j * 7) % 11) / 10, rev=.05)
     t_turn = next(s[0] for s in R.SHOTS if s[5]['kind'] == 'turn')
     t_days = next(s[0] for s in R.SHOTS if s[5]['kind'] == 'day')
     t_build = next(s[0] for s in R.SHOTS if s[5]['kind'] == 'build')

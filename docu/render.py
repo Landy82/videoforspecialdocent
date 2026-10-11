@@ -1,7 +1,8 @@
 """부마민주항쟁 × 특별도슨트 홍보 숏폼 v1.2 (실물 영상만 사용)
 - 촬영 영상(1080×1920 변환본) 위에 키네틱 타이포·날짜 그래픽만 얹는다. AI 생성 이미지·영상 없음.
 - 음악에 맞춘 편집: 96BPM(1마디 2.5초) 격자 위에 모든 컷, 글자 등장, 줌 펄스가 박자에 떨어진다.
-- 폰트(OFL, docu/fonts2): 본명조 Noto Serif KR(제목) · Pretendard(본문, 가는 숫자)
+- 폰트(OFL, docu/fonts2): Pretendard 한 가족으로 통일 (제목 Bold · 본문 Medium · 숫자 Light/Thin)
+- 키컬러 #62579F (보라). 0~25초는 타자기 효과 + 타자음 (32분음표마다 한 글자)
 - 사운드: docu/score.py 작곡(오픈 사운드폰트 악기) + docu/sound.py 효과음·믹스 + 마지막 배우 원음 대사 한 줄
 - 기록 사진: ARCHIVE_DIR 의 이미지를 kind='archive' 컷으로 넣을 수 있다 (사용 권한을 확인한 자료만)
   python3 docu/render.py <영상 폴더> <출력.mp4>
@@ -14,12 +15,13 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 W, H, FPS = 1080, 1920, 30
 SAFE_L, SAFE_R, SAFE_T, SAFE_B = 60, 930, 250, 1520
-ACCENT = (232, 73, 42)
+ACCENT = (98, 87, 159)          # 키컬러 #62579F — 막대·박스·선
+ACCENT_T = (172, 162, 232)      # 같은 보라의 밝은 톤 — 어두운 화면 위 글자·커서
 PAPER = (237, 230, 216)
 WHITE = (255, 255, 255)
 FONT_DIR = os.environ.get('FONT_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts2'))
-F_HEAD = os.path.join(FONT_DIR, 'NotoSerifKR-700.ttf')
-F_HEAD_M = os.path.join(FONT_DIR, 'NotoSerifKR-500.ttf')
+F_HEAD = os.path.join(FONT_DIR, 'Pretendard-Bold.otf')
+F_HEAD_M = os.path.join(FONT_DIR, 'Pretendard-Medium.otf')
 F_SANS = os.path.join(FONT_DIR, 'Pretendard-SemiBold.otf')
 F_SANS_M = os.path.join(FONT_DIR, 'Pretendard-Medium.otf')
 F_SANS_B = os.path.join(FONT_DIR, 'Pretendard-Bold.otf')
@@ -46,8 +48,9 @@ BPM = 96
 BEAT = 60 / BPM
 BAR = 4 * BEAT
 DAYS = ['16', '17', '18', '19', '20']
-CPS = 8 / BEAT                         # 타이핑: 32분음표마다 한 글자
-HOOK_D = (BEAT / 2, 2 * BEAT)          # 훅 두 줄 타이핑 시작 — sound.py 타자음과 공유
+STEP = BEAT / 8                        # 타자기: 32분음표마다 한 글자
+CPS = 1 / STEP
+TYPE_UNTIL = 25.0                      # 이 시각까지의 카드 글자는 모두 타자기로
 CTA_D = dict(label=.5 * BEAT, title=1 * BEAT, rule=1.75 * BEAT, l3=2 * BEAT, l4=3 * BEAT, shine=4 * BEAT)  # 엔딩 등장(박)
 _M = 2 * BEAT                          # 몽타주 컷 길이(2박)
 SHOTS = [
@@ -251,7 +254,7 @@ def day_bar(c, cur, place, t):
             if t > BEAT:
                 rr = 15 + 40 * ring
                 d.ellipse([cx - rr, ly - rr, cx + rr, ly + rr], outline=ACCENT + (int(255 * (1 - ring)),), width=4)
-            col, sz = ACCENT, 76
+            col, sz = ACCENT_T, 76
         else:
             r, col, sz = 8, (WHITE if i < cur else (140, 140, 140)), 42
         if r > 0:
@@ -259,7 +262,7 @@ def day_bar(c, cur, place, t):
         fnt = F_NUM if i == cur else F_SANS
         tw = line_width(dd, fnt, sz)
         if i == cur:
-            roll(c, dd, fnt, sz, cx - tw / 2, ly - 22 - sz * 1.3, t, BEAT / 2, fill=ACCENT, steps=5, dur=.55)
+            roll(c, dd, fnt, sz, cx - tw / 2, ly - 22 - sz * 1.3, t, BEAT / 2, fill=ACCENT_T, steps=5, dur=.55)
         else:
             kinetic(c, dd, fnt, sz, cx - tw / 2, ly - 18 - sz * 1.3, 99, fill=col, shadow=False)
     # 장소 태그: 레드오렌지 블록이 쓸고 지나가며 종이색 태그를 남김
@@ -268,9 +271,9 @@ def day_bar(c, cur, place, t):
     wp = ease((t - .15) / .3)
     wo = ease((t - .45) / .3)
     if t > .45:
-        bar(c, x0 - 10, ty, tag_w * wo, 66, PAPER)
-        kinetic(c, place, F_SANS_B, 40, x0 + 10, ty + 4, t, .5, fill=(20, 19, 18), stagger=.03, dur=.25, style='fade', shadow=False)
-    bar(c, x0 - 10 + tag_w * wo, ty, tag_w * (wp - wo), 66, ACCENT)
+        bar(c, x0 - 10, ty, tag_w * wo, 66, ACCENT)
+        kinetic(c, place, F_SANS_B, 40, x0 + 10, ty + 4, t, .5, fill=WHITE, stagger=.03, dur=.25, style='fade', shadow=False)
+    bar(c, x0 - 10 + tag_w * wo, ty, tag_w * (wp - wo), 66, ACCENT_T)
 
 
 @lru_cache(maxsize=None)
@@ -290,6 +293,61 @@ def line_alpha(txt, path, size):
 _PART = np.random.default_rng(1016).random((80, 5))
 
 
+def type_plan(card):
+    """0~25초 카드의 타자기 줄 목록 (그리기와 sound.py 타자음이 같은 시각을 쓴다).
+    줄마다 앞 줄이 끝난 뒤 다음 16분음표에서 시작하고, 글자는 32분음표마다 하나씩 찍힌다."""
+    k = card['kind']
+    if k == 'hook':
+        lines, s = [(card['l1'], F_HEAD, 108, SAFE_L + 20, 1080, WHITE, -2), (card['l2'], F_HEAD, 108, SAFE_L + 20, 1225, WHITE, -2)], BEAT / 2
+    elif k == 'date':
+        y0 = 1040
+        lines = [(card['date'], F_NUM, 112, SAFE_L + 18, y0 + 26, WHITE, 0), (card['text'], F_HEAD, 92, SAFE_L + 20, y0 + 190, WHITE, -2)]
+        if card.get('sub'):
+            lines.append((card['sub'], F_SANS_M, 46, SAFE_L + 24, y0 + 318, (225, 225, 225), 1))
+        s = 0.0
+    elif k == 'day':
+        lines, s = [(card['text'], F_HEAD, 100, SAFE_L + 20, 1160, WHITE, -2), (card['sub'], F_HEAD, 100, SAFE_L + 20, 1295, WHITE, -2)], BEAT / 2
+    else:
+        return []
+    plan = []
+    for txt, f, size, x, y, fill, tr in lines:
+        plan.append(dict(txt=txt, font=f, size=size, x=x, y=y, fill=fill, start=s, track=tr))
+        end = s + (len(txt) - 1) * STEP
+        s = math.ceil((end + STEP) / (BEAT / 4) - 1e-9) * (BEAT / 4)
+    return plan
+
+
+def typing_events():
+    """[(시각, 글자)] — sound.py 가 타자음을 같은 자리에 놓는다"""
+    ev = []
+    for t0, t1, _, _, _, card in SHOTS:
+        if t0 >= TYPE_UNTIL:
+            break
+        for ln in type_plan(card):
+            for j, ch in enumerate(ln['txt']):
+                tt = t0 + ln['start'] + j * STEP
+                if tt < t1 - BEAT / 4:
+                    ev.append((tt, ch))
+    return ev
+
+
+def typewriter(c, card, lt, dur):
+    """한 글자씩 찍히고, 지금 치는 줄 끝에서 보라 커서가 8분음표마다 깜빡인다"""
+    out = dur - BEAT / 4
+    plan = type_plan(card)
+    for ln in plan:
+        kinetic(c, ln['txt'], ln['font'], ln['size'], ln['x'], ln['y'], lt, ln['start'], fill=ln['fill'], stagger=STEP,
+                dur=.02, style='fade', out=out, track=ln['track'])
+    cur = [ln for ln in plan if ln['start'] <= lt]
+    if cur and lt < out:
+        ln = cur[-1]
+        n = min(len(ln['txt']), int((lt - ln['start']) / STEP) + 1)
+        typing = n < len(ln['txt'])
+        if typing or int(lt / (BEAT / 2)) % 2 == 0:
+            x = ln['x'] + line_width(ln['txt'][:n], ln['font'], ln['size'], ln['track']) + 10
+            bar(c, x, ln['y'] + ln['size'] * .22, max(4, ln['size'] * .06), ln['size'] * 1.05, ACCENT_T)
+
+
 def overlay(card, t, shot_t0, shot_t1):
     lt, dur = t - shot_t0, shot_t1 - shot_t0
     c = Image.new('RGBA', (W, H), (0, 0, 0, 0))
@@ -299,30 +357,19 @@ def overlay(card, t, shot_t0, shot_t1):
         lw = line_width('부마민주항쟁', F_SANS, 30, 6) + 40
         bar(c, SAFE_L + 20, SAFE_T + 20, lw * ease(lt / .3), 58, ACCENT)
         kinetic(c, '부마민주항쟁', F_SANS, 30, SAFE_L + 40, SAFE_T + 28, lt, .15, stagger=.03, dur=.3, shadow=False, track=6)
-        out = dur - BEAT / 2
-        for li, (txt, y) in enumerate(((card['l1'], 1080), (card['l2'], 1225))):
-            d0 = HOOK_D[li]
-            kinetic(c, txt, F_HEAD, 108, SAFE_L + 20, y, lt, d0, stagger=1 / CPS, dur=.12, style='pop', out=out, track=-2)
-            n = min(len(txt), int(max(0, lt - d0) * CPS))
-            active = lt > d0 and (li == 1 or lt < HOOK_D[1]) and lt < out
-            if active and (n < len(txt) or int(lt / BEAT * 2) % 2 == 0):  # 8분음표마다 깜빡이는 커서
-                bar(c, SAFE_L + 28 + line_width(txt[:n], F_HEAD, 108, -2), y + 22, 6, 120, ACCENT)
+        typewriter(c, card, lt, dur)
     elif k == 'date':
-        out = dur - BEAT / 2
+        out = dur - BEAT / 4
         giant(c, card['date'][:4], 500, lt, dur, 300, 55)
         y0 = 1040
         wb, wo = ease(lt / (BEAT / 2)), ease((lt - out) / .25)
-        bar(c, SAFE_L + 22 + 64 * wo, y0, 64 * (wb - wo), 5, ACCENT)               # 박에 그어지는 짧은 선
-        roll(c, card['date'], F_NUM, 112, SAFE_L + 18, y0 + 26, lt, .05, out=out)
-        kinetic(c, card['text'], F_HEAD, 92, SAFE_L + 20, y0 + 190, lt, BEAT / 2, out=out, track=-2)
-        if card.get('sub'):
-            kinetic(c, card['sub'], F_SANS_M, 46, SAFE_L + 24, y0 + 318, lt, BEAT, fill=(225, 225, 225), stagger=.025, out=out, track=1)
+        bar(c, SAFE_L + 22 + 64 * wo, y0, 64 * (wb - wo), 6, ACCENT_T)              # 박에 그어지는 짧은 선
+        typewriter(c, card, lt, dur)
     elif k == 'day':
-        out = dur - BEAT / 2
+        out = dur - BEAT / 4
         giant(c, DAYS[card['day']], 820, lt, dur, 470, 50)
         day_bar(c, card['day'], card['place'], lt)
-        kinetic(c, card['text'], F_HEAD, 100, SAFE_L + 20, 1160, lt, BEAT / 2, out=out, track=-2)
-        kinetic(c, card['sub'], F_HEAD, 100, SAFE_L + 20, 1295, lt, BEAT, out=out, track=-2)
+        typewriter(c, card, lt, dur)
         kinetic(c, '출처 · 민주화운동기념사업회 오픈아카이브 「민주화운동 일지」', F_SANS_M, 24, SAFE_L + 22, 1462, lt, BEAT * 1.5,
                 fill=(185, 185, 185), stagger=.005, style='fade', out=out, shadow=True)
     elif k == 'build':
@@ -337,17 +384,17 @@ def overlay(card, t, shot_t0, shot_t1):
         kinetic(c, card.get('credit', ''), F_SANS_M, 26, SAFE_L + 20, 1410, lt, BEAT, fill=(200, 200, 200), out=dur - BEAT / 2)
     elif k == 'turn':
         kinetic(c, card['l1'], F_HEAD_M, 88, SAFE_L + 20, 1110, lt, .05, stagger=.05, track=-2)
-        w2 = kinetic(c, card['l2'], F_HEAD, 116, SAFE_L + 20, 1235, lt, BEAT, fill=PAPER, stagger=.06, style='pop', track=-3)
-        bar(c, SAFE_L + 22, 1235 + asc(F_HEAD, 116) + 34, w2 * ease_io((lt - 2 * BEAT) / .5), 6, ACCENT)
+        w2 = kinetic(c, card['l2'], F_HEAD, 116, SAFE_L + 20, 1235, lt, BEAT, fill=WHITE, stagger=.06, style='pop', track=-3)
+        bar(c, SAFE_L + 22, 1235 + asc(F_HEAD, 116) + 34, w2 * ease_io((lt - 2 * BEAT) / .5), 6, ACCENT_T)
     elif k == 'montage':
-        kinetic(c, '민주화운동기념관 특별도슨트', F_SANS, 30, SAFE_L + 20, SAFE_T + 24, 99, fill=PAPER, track=4)
+        kinetic(c, '민주화운동기념관 특별도슨트', F_SANS, 30, SAFE_L + 20, SAFE_T + 24, 99, fill=(225, 222, 240), track=4)
         sz = card.get('size', 150)
         acc = card.get('accent')
         cx = (SAFE_L + SAFE_R) / 2
-        ww = kinetic(c, card['word'], F_HEAD, sz, cx, 1180, lt, .02, fill=ACCENT if acc else WHITE, stagger=.045,
+        ww = kinetic(c, card['word'], F_HEAD, sz, cx, 1180, lt, .02, fill=ACCENT_T if acc else WHITE, stagger=.045,
                      dur=.35, style='pop', align='center', out=None if acc else dur - .18, track=-3)
         u = ease_io((lt - BEAT / 2) / .3) * (1 if acc else 1 - ease((lt - dur + .2) / .2))
-        bar(c, cx - ww / 2 * u, 1180 + asc(F_HEAD, sz) + 36, ww * u, 6, PAPER if acc else ACCENT)
+        bar(c, cx - ww / 2 * u, 1180 + asc(F_HEAD, sz) + 36, ww * u, 6, WHITE if acc else ACCENT_T)
     elif k == 'voice':
         kinetic(c, card['text'], F_HEAD_M, 56, (SAFE_L + SAFE_R) / 2, 1330, lt, .2, stagger=.03, dur=.4, align='center',
                 out=dur - .4, track=-1)
@@ -372,11 +419,11 @@ def overlay(card, t, shot_t0, shot_t1):
             pos = -150 + (m.shape[1] + 300) * ease_io(sp)
             band = np.exp(-((xx + yy * .35 - pos) ** 2) / (2 * 45 ** 2))
             arr = np.zeros(m.shape + (4,), np.uint8)
-            arr[..., :3] = ACCENT
+            arr[..., :3] = ACCENT_T
             arr[..., 3] = (m * band * 255).astype(np.uint8)
             c.alpha_composite(Image.fromarray(arr), (int(cx - tw / 2 - pad), int(768 - pad)))
         u = ease_io((lt - CTA_D['rule']) / .45)
-        bar(c, cx - 70 * u, 990, 140 * u, 5, ACCENT)
+        bar(c, cx - 70 * u, 990, 140 * u, 5, ACCENT_T)
         kinetic(c, '매주 금토일', F_SANS_M, 56, cx, 1040, lt, CTA_D['l3'], stagger=.045, align='center', track=2)
         kinetic(c, '오후 3시', F_SANS_M, 56, cx, 1124, lt, CTA_D['l4'], stagger=.045, align='center', track=2)
     return c
