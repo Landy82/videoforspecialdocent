@@ -59,7 +59,7 @@ SHOTS = [
     (7 * BAR, 8 * BAR, 'woman', 45.0, 1, dict(kind='day', day=3, place='마산', text='마산으로', sub='번진 시위')),
     (8 * BAR, 9 * BAR, 'spot', 91.0, 1, dict(kind='day', day=4, place='마산·창원', text='정오,', sub='위수령 발동')),
     (9 * BAR, 10 * BAR, 'draw', 64.0, .5, dict(kind='date', date='1979. 10. 26', text='18년 유신체제의 끝')),
-    (10 * BAR, 11 * BAR, 'draw', 64.0 + BAR * .5, .5, dict(kind='build')),
+    (10 * BAR, 11 * BAR, 'draw', 76.0, .5, dict(kind='build')),
     (11 * BAR, 12 * BAR, 'sign', 38.0, .5, dict(kind='turn', l1='그 역사를,', l2='몸으로 기억하다')),
     (12 * BAR + 0 * _M, 12 * BAR + 1 * _M, 'woman', 68.0, 1, dict(kind='montage', word='춤으로')),
     (12 * BAR + 1 * _M, 12 * BAR + 2 * _M, 'spot', 60.0, 1, dict(kind='montage', word='만나는')),
