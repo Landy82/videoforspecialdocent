@@ -29,7 +29,9 @@ ARCHIVE_DIR = os.environ.get('ARCHIVE_DIR', 'archive')
 
 # ── 소스 (변환본 파일명, 원본 fps) ──────────────────────
 SRC = {
-    'yusin': ('px_5fdb044c.mp4', 60),     # 유신 현수막 앞 배우 (120fps 원본 → 60fps)
+    # 주의: 60fps 변환본 3개(yusin·draw·sign)는 실제로는 30fps 내용이 두 장씩 반복된다.
+    #       속도 .5(슬로모션)로 쓰면 같은 그림이 두 번씩 나와 초당 15장처럼 끊기므로 속도 1로만 쓴다.
+    'yusin': ('px_5fdb044c.mp4', 60),     # 유신 현수막 앞 배우
     'spot': ('px_2f255e51.mp4', 30),      # 스포트라이트 속 남성 배우
     'woman': ('px_bfd61af1.mp4', 30),     # 여성 독백 장면
     'draw': ('px_083bac20.mp4', 60),      # 남성 무용수 + 대형 일러스트
@@ -49,22 +51,22 @@ HOOK_D = (BEAT / 2, 2 * BEAT)          # 훅 두 줄 타이핑 시작 — sound.
 CTA_D = dict(label=.5 * BEAT, title=1 * BEAT, rule=1.75 * BEAT, l3=2 * BEAT, l4=3 * BEAT, shine=4 * BEAT)  # 엔딩 등장(박)
 _M = 2 * BEAT                          # 몽타주 컷 길이(2박)
 SHOTS = [
-    (0 * BAR, 1 * BAR, 'yusin', 14.0, .5, dict(kind='hook', l1='1979년 10월,', l2='부산과 마산에서')),
+    (0 * BAR, 1 * BAR, 'yusin', 14.0, 1, dict(kind='hook', l1='1979년 10월,', l2='부산과 마산에서')),
     (1 * BAR, 2 * BAR, 'spot', 18.0, 1, dict(kind='date', date='1972. 10', text='유신헌법 선포')),
-    (2 * BAR, 3 * BAR, 'yusin', 22.0, .5, dict(kind='date', date='1975. 05', text='긴급조치 9호', sub='집회와 시위 금지')),
+    (2 * BAR, 3 * BAR, 'yusin', 22.0, 1, dict(kind='date', date='1975. 05', text='긴급조치 9호', sub='집회와 시위 금지')),
     (3 * BAR, 4 * BAR, 'spot', 40.0, 1, dict(kind='date', date='1979. 10. 04', text='김영삼 의원', sub='국회의원직 제명')),
-    (4 * BAR, 5 * BAR, 'draw', 36.0, .5, dict(kind='day', day=0, place='부산', text='부산대에서', sub='시위가 시작되다')),
-    (5 * BAR, 6 * BAR, 'draw', 3.0, .5, dict(kind='day', day=1, place='부산', text='시민들이', sub='거리로')),
-    (6 * BAR, 7 * BAR, 'yusin', 16.0, .5, dict(kind='day', day=2, place='부산', text='0시,', sub='비상계엄 선포')),
+    (4 * BAR, 5 * BAR, 'draw', 36.0, 1, dict(kind='day', day=0, place='부산', text='부산대에서', sub='시위가 시작되다')),
+    (5 * BAR, 6 * BAR, 'draw', 3.0, 1, dict(kind='day', day=1, place='부산', text='시민들이', sub='거리로')),
+    (6 * BAR, 7 * BAR, 'yusin', 16.0, 1, dict(kind='day', day=2, place='부산', text='0시,', sub='비상계엄 선포')),
     (7 * BAR, 8 * BAR, 'woman', 45.0, 1, dict(kind='day', day=3, place='마산', text='마산 시민 수천 명', sub='반정부 시위')),
     (8 * BAR, 9 * BAR, 'spot', 91.0, 1, dict(kind='day', day=4, place='마산·창원', text='정오,', sub='위수령 발동')),
-    (9 * BAR, 10 * BAR, 'draw', 64.0, .5, dict(kind='date', date='1979. 10. 26', text='18년 유신체제의 끝')),
-    (10 * BAR, 11 * BAR, 'draw', 76.0, .5, dict(kind='build')),
-    (11 * BAR, 12 * BAR, 'sign', 38.0, .5, dict(kind='turn', l1='그 역사를,', l2='몸으로 기억하다')),
+    (9 * BAR, 10 * BAR, 'draw', 64.0, 1, dict(kind='date', date='1979. 10. 26', text='18년 유신체제의 끝')),
+    (10 * BAR, 11 * BAR, 'draw', 76.0, 1, dict(kind='build')),
+    (11 * BAR, 12 * BAR, 'sign', 38.0, 1, dict(kind='turn', l1='그 역사를,', l2='몸으로 기억하다')),
     (12 * BAR + 0 * _M, 12 * BAR + 1 * _M, 'woman', 68.0, 1, dict(kind='montage', word='춤으로')),
     (12 * BAR + 1 * _M, 12 * BAR + 2 * _M, 'spot', 60.0, 1, dict(kind='montage', word='만나는')),
-    (12 * BAR + 2 * _M, 12 * BAR + 3 * _M, 'sign', 15.0, .5, dict(kind='montage', word='민주화운동의', size=124)),
-    (12 * BAR + 3 * _M, 12 * BAR + 4 * _M, 'draw', 57.0, .5, dict(kind='montage', word='역사')),
+    (12 * BAR + 2 * _M, 12 * BAR + 3 * _M, 'sign', 15.0, 1, dict(kind='montage', word='민주화운동의', size=124)),
+    (12 * BAR + 3 * _M, 12 * BAR + 4 * _M, 'draw', 57.0, 1, dict(kind='montage', word='역사')),
     (12 * BAR + 4 * _M, 12 * BAR + 5 * _M, 'woman', 77.0, 1, dict(kind='montage', word='특별도슨트', accent=True)),
     (12 * BAR + 5 * _M, 17 * BAR, 'final', 29.6, 1, dict(kind='voice', text='"우리가 대한민국의 주인입니다."')),
     (17 * BAR, 20 * BAR, 'final', 35.1, 1, dict(kind='cta')),
@@ -423,7 +425,7 @@ def scrim(g, top=.55, bottom=.75):
 _EDGE = np.clip((_X ** 2 + ((_Y - .5) * 2) ** 2 - .55) / 1.2, 0, 1)   # 가장자리 빛번짐
 _GLOW = np.exp(-(_X ** 2 + ((_Y - .45) * 3.2) ** 2) * 2.2)             # 엔딩 제목 뒤 은은한 빛
 _ACC = np.array(ACCENT, np.float32)[None, None, :] / 255
-_GRAIN = [np.random.default_rng(1979 + k).normal(0, .025, (H // 2, W // 2, 1)).astype(np.float32) for k in range(4)]
+_GRAIN = [np.random.default_rng(1979 + k).normal(0, .016, (H // 2, W // 2, 1)).astype(np.float32) for k in range(4)]
 _FLASH = {int(round(sh[0] * FPS)) for sh in SHOTS if sh[5]['kind'] == 'turn'}
 _RD, _ROOT = None, None
 _ARCH = {}
@@ -431,14 +433,14 @@ _ARCH = {}
 
 def beat_pulse(t, kind):
     """박마다 화면이 살짝 당겨졌다 풀림 (마디 첫 박은 더 세게) — 음악과 같은 격자"""
-    amp = {'day': .022, 'montage': .03, 'turn': .02, 'build': .016, 'date': .01}.get(kind, 0)
+    amp = {'day': .012, 'montage': .018, 'turn': .012, 'build': .01, 'date': .006}.get(kind, 0)
     if not amp:
         return 0.0
     nb = math.floor(t / BEAT + 1e-6)
     since = t - nb * BEAT
     if nb % 4 == 0:
-        amp *= 1.8
-    return amp * math.exp(-since * 9)
+        amp *= 1.5
+    return amp * (1 - math.exp(-since * 30)) * math.exp(-since * 5)   # 한 프레임에 튀지 않게 부드럽게 오르내림
 
 
 def archive_frame(name, p):
@@ -515,7 +517,8 @@ def main(root, out, workers=os.cpu_count()):
     _ROOT = root
     tmp = out + '.video.mp4'
     p = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', str(FPS), '-i', '-',
-                          '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p', tmp], stdin=subprocess.PIPE)
+                          '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-maxrate', '10M', '-bufsize', '20M', '-g', '60',
+                          '-profile:v', 'high', '-pix_fmt', 'yuv420p', tmp], stdin=subprocess.PIPE)
     n = int(DURATION * FPS)
     from multiprocessing import Pool
     CH = 20  # 연속 구간 단위로 나눠 순차 읽기 유지
