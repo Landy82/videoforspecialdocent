@@ -85,7 +85,8 @@ def extend(x, need):
 
 
 class Inst:
-    def __init__(self, root, sub, pat='.', excl=None, pitched=True, sustain=True, release=.35, gain=1.0, pan=0.0):
+    def __init__(self, root, sub, pat='.', excl=None, pitched=True, sustain=True, release=.35, gain=1.0, pan=0.0,
+                 keyfn=None, shift=True):
         files = [f for f in glob.glob(os.path.join(root, sub, '*.wav'))
                  if re.search(pat, os.path.basename(f)) and not (excl and re.search(excl, os.path.basename(f)))]
         if not files:
@@ -94,13 +95,13 @@ class Inst:
         for f in files:
             b = os.path.basename(f)
             m = re.search(r'_([A-G][#b]?)(-?\d)(?=[_.])', b)
-            key = (int(m.group(2)) + 1) * 12 + NOTE[m.group(1)] if (m and pitched) else 0
+            key = keyfn(b) if keyfn else ((int(m.group(2)) + 1) * 12 + NOTE[m.group(1)] if (m and pitched) else 0)
             v = re.search(r'_v(\d+)', b)
             d = re.search(r'_(pp|p|mp|mf|f|ff|fff)(?=[_.])', b)
             vel = int(v.group(1)) if v else (DYN[d.group(1)] if d else 1)
             self.z.setdefault(key, {}).setdefault(vel, []).append(f)
         self.keys = np.array(sorted(self.z))
-        self.pitched, self.sustain, self.release, self.gain, self.pan = pitched, sustain, release, gain, pan
+        self.pitched, self.sustain, self.release, self.gain, self.pan, self.shift = pitched, sustain, release, gain, pan, shift
         self.rr = 0
 
     def render(self, key, vel, dur):
@@ -110,7 +111,7 @@ class Inst:
         paths = sorted(self.z[k][layers[li]])
         self.rr += 1
         x = load(paths[self.rr % len(paths)])
-        if self.pitched and key != k:                                 # 음높이 옮기기
+        if self.pitched and self.shift and key != k:                  # 음높이 옮기기
             r = 2 ** ((key - k) / 12)
             n = int(len(x) / r)
             t = np.arange(n) * r
@@ -156,8 +157,9 @@ def build_insts(root):
     add('tbn', 'Brass/Tenor Trombone/sus', gain=.65, pan=.25)
     add('tuba', 'Brass/Tuba/sus', r'_Mid', gain=.75, pan=.35)
     add('glock', 'Percussion/Glock', sustain=False, release=0, gain=.45, pan=.3)
-    add('timp', 'Percussion', r'^Timpani\d_', r'Roll', pitched=False, sustain=False, release=0, gain=1.0, pan=-.05)
-    add('timp_roll', 'Percussion', r'^Timpani\d_Roll', pitched=False, gain=.9, pan=-.05)
+    # 팀파니 북 5개(1=가장 낮음으로 가정): 악보 음에 가장 가까운 북을 고르고 음높이는 옮기지 않는다
+    add('timp', 'Percussion/Timpani', r'_Hit_', sustain=False, release=0, gain=1.0, pan=-.05, shift=False,
+        keyfn=lambda b: 31 + 4 * int(re.search(r'Timpani(\d)', b).group(1)))
     add('bdrum', 'Percussion', r'^BDrumNewhit', pitched=False, sustain=False, release=0, gain=1.0)
     add('snare', 'Percussion', r'^Snare2-HitSN', pitched=False, sustain=False, release=0, gain=.6, pan=.1)
     add('crash', 'Percussion', r'^cymbal-crash1_', pitched=False, sustain=False, release=0, gain=.6, pan=.15)
