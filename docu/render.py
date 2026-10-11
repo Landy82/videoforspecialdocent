@@ -56,7 +56,7 @@ SHOTS = [
     (4 * BAR, 5 * BAR, 'draw', 36.0, .5, dict(kind='day', day=0, place='부산', text='부산대에서', sub='시위가 시작되다')),
     (5 * BAR, 6 * BAR, 'draw', 3.0, .5, dict(kind='day', day=1, place='부산', text='시민들이', sub='거리로')),
     (6 * BAR, 7 * BAR, 'yusin', 16.0, .5, dict(kind='day', day=2, place='부산', text='0시,', sub='비상계엄 선포')),
-    (7 * BAR, 8 * BAR, 'woman', 45.0, 1, dict(kind='day', day=3, place='마산', text='마산으로', sub='번진 시위')),
+    (7 * BAR, 8 * BAR, 'woman', 45.0, 1, dict(kind='day', day=3, place='마산', text='마산 시민 수천 명', sub='반정부 시위')),
     (8 * BAR, 9 * BAR, 'spot', 91.0, 1, dict(kind='day', day=4, place='마산·창원', text='정오,', sub='위수령 발동')),
     (9 * BAR, 10 * BAR, 'draw', 64.0, .5, dict(kind='date', date='1979. 10. 26', text='18년 유신체제의 끝')),
     (10 * BAR, 11 * BAR, 'draw', 76.0, .5, dict(kind='build')),
@@ -321,6 +321,8 @@ def overlay(card, t, shot_t0, shot_t1):
         day_bar(c, card['day'], card['place'], lt)
         kinetic(c, card['text'], F_HEAD, 100, SAFE_L + 20, 1160, lt, BEAT / 2, out=out, track=-2)
         kinetic(c, card['sub'], F_HEAD, 100, SAFE_L + 20, 1295, lt, BEAT, out=out, track=-2)
+        kinetic(c, '출처 · 민주화운동기념사업회 오픈아카이브 「민주화운동 일지」', F_SANS_M, 24, SAFE_L + 22, 1462, lt, BEAT * 1.5,
+                fill=(185, 185, 185), stagger=.005, style='fade', out=out, shadow=True)
     elif k == 'build':
         # 10.26 이후 한 마디: 글자 없이 박마다 하나씩 켜지는 네 개의 선 (빌드업 카운트)
         cx = (SAFE_L + SAFE_R) / 2
