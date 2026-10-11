@@ -29,3 +29,10 @@ Higgsfield 작업 공간에서 했고, 작업 저장소 환경에서는 Higgsfie
 ## 부마 × 특별도슨트 30초 모션 숏폼 v2.0 (motion/)
 - 콘셉트 「선 하나가 몸이 되고, 몸이 역사가 된다」 · 120BPM · 60fps · 보라 #62579F 메인 · 루프
 - https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/1f5de74a-124e-4824-8c26-6eb5a82c0cfc.mp4
+
+## 부마민주항쟁 숏츠 v1.2 — 음악에 맞춘 편집
+- 음악: docu/score.py 로 직접 작곡(96BPM, D단조→F장조), 오픈 사운드폰트 GeneralUser GS(상업 이용 가능)의 피아노·현악·첼로·팀파니·타이코·합창으로 연주 + docu/sound.py 효과음·믹스, -13.3 LUFS
+- 편집: 모든 컷을 마디(2.5초) 위로, 몽타주는 2박마다. 글자 등장·날짜 진행·줌 펄스가 박자에 맞춰 움직임. 10.26 뒤 한 마디 빌드업(박마다 선 하나) → 1/8박 정적 → 전환
+- 폰트: 본명조(Noto Serif KR) 제목 + Pretendard 본문·가는 숫자 (docu/fonts2, OFL)
+- 50초 · 1080×1920 30fps
+- https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/c1603d4f-e27c-4d74-bdd1-51baad8ab88d.mp4
