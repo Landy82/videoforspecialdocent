@@ -223,7 +223,8 @@ def build(path):
     duck = np.ones(n)
     v0, v1 = int(vt * SR), int((vt + vlen) * SR)
     ramp = int(.25 * SR)
-    duck[v0 - ramp:v0] = np.linspace(1, .35, ramp); duck[v0:v1] = .35; duck[v1:v1 + ramp] = np.linspace(.35, 1, ramp)
+    dk = .55 if (os.environ.get('VSCO') or os.environ.get('ORCH')) else .35
+    duck[v0 - ramp:v0] = np.linspace(1, dk, ramp); duck[v0:v1] = dk; duck[v1:v1 + ramp] = np.linspace(dk, 1, ramp)
     # 구간 자동화: 몽타주를 가장 크게, 엔딩은 여유 있게
     t_m = next(s[0] for s in R.SHOTS if s[5]['kind'] == 'montage')
     auto = np.interp(np.arange(n) / SR, [0, t_m - .05, t_m, vt - .3, vt], [1, 1, 1.45, 1.45, 1])

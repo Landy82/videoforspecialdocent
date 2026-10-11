@@ -531,8 +531,14 @@ def main(root, out, workers=int(os.environ.get('WORKERS', max(1, (os.cpu_count()
                 p.stdin.write(fr)
             print('frame', min(n, b + step), '/', n, flush=True)
     p.stdin.close(); p.wait()
-    # 오디오: 합성 사운드트랙 + 마지막 배우 원음 한 줄 → 전체 -14 LUFS
+    mux(root, tmp, out)
+    os.remove(tmp)
+
+
+def mux(root, video, out):
+    """영상(무음) + 배경음악(sound.py) + 마지막 배우 원음 한 줄 → 전체 -14 LUFS"""
     import sound
+    tmp = video
     music = out + '.music.wav'
     sound.build(music)
     vt, vkey, vst, vlen = VOICE
@@ -546,11 +552,13 @@ def main(root, out, workers=int(os.environ.get('WORKERS', max(1, (os.cpu_count()
                     f'[m][v]amix=inputs=2:normalize=0:duration=first,loudnorm=I=-14:TP=-1.5:LRA=11,aformat=sample_rates=48000[a]',
                     '-map', '0:v', '-map', '[a]', '-t', str(DURATION), '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000',
                     '-movflags', '+faststart', out], check=True)
-    os.remove(tmp)
     os.remove(music)
     print('done', out)
 
 
 if __name__ == '__main__':
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    main(sys.argv[1], sys.argv[2])
+    if len(sys.argv) > 4 and sys.argv[3] == '--remux':     # 영상은 그대로, 소리만 다시: render.py <src> <out> --remux <기존.mp4>
+        mux(sys.argv[1], sys.argv[4], sys.argv[2])
+    else:
+        main(sys.argv[1], sys.argv[2])
