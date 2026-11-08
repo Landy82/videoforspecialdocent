@@ -198,10 +198,11 @@ def route(part, ch, key):
     raise KeyError((part, ch))
 
 
-def render_stems(duration):
+def render_stems(duration, compose=None):
+    """compose(duration) → {파트이름: score.Part}. 생략하면 부마 숏츠 악보(score.compose)"""
     root = vsco_root()
     I = build_insts(root)
-    parts = S.compose(duration)
+    parts = (compose or S.compose)(duration)
     n = int(duration * SR) + SR
     stems = {}
     timp_roll_spans = []
