@@ -67,3 +67,12 @@ Higgsfield 작업 공간에서 했고, 작업 저장소 환경에서는 Higgsfie
 - 재현: `python3 reviews/reviews_video.py <영상 폴더(px_*.mp4)> out.mp4`
 - 59초 · 1080×1920 30fps · 9Mbps
 - https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/0925f8f4-5c68-449a-9494-88f15f62c9d5.mp4
+
+## 관객 리뷰 숏츠 v1.1 — 더 빠르게, 후기 약 50개
+- 카드 한 장 4박(≈2.5초, v1.0의 절반), 단어는 32분음표마다 등장(2배 빠르게)
+- 말풍선 2묶음 × 16개(반 박마다 하나) + 큰 글씨 8개가 박마다 쌓이는 장면 → 후기 19개 → 약 50개
+- 영상 컷도 박 단위로 더 자주(22컷): 노란 옷 2인 무대, 붉은 옷 배우(draw 56초~), 긴 머리·짧은 머리 남자 배우, 포니테일 여자 배우, 피켓 장면 등 섞음
+- 글자를 가리던 컷 교체(피켓 앞 카드, 흰 소매 위 영어 카드)
+- 음악 없음, 59초 · 1080×1920 30fps · 8.8Mbps. 영상: 기존 6개만 사용(E드라이브 폴더 아직 미연결)
+- 재현: `python3 reviews/reviews_video.py <영상 폴더> out.mp4` (커밋 9ac051a)
+- https://d2ol7oe51mr4n9.cloudfront.net/user_3BVmzaDnwYqNBNwBPW7xvH5fv2f/8f71f13d-11a0-41d3-9485-f70ad6c2d988.mp4
